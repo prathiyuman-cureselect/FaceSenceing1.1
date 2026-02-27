@@ -187,22 +187,23 @@ class RPPGEngine:
         )
 
         # Step 10: Rejection logic
-        if self.signal_processor.should_reject(quality):
-            result.message = "Signal quality low. Please sit still and ensure good lighting."
+        if quality.overall_level == SignalQualityLevel.REJECTED:
+            result.message = "Signal quality too low. Please sit still and ensure good lighting."
             quality.is_acceptable = False
             
-            # If rejected too many times, auto-reset to clear potential artifacts
+            # If rejected too many times, auto-reset
             if self.signal_processor._consecutive_rejections > 50:
                 logger.info("Auto-resetting buffers due to persistent rejection")
                 self.reset()
         else:
-            # Track valid measurements
+            # For POOR, FAIR, GOOD, EXCELLENT, we show the readings
             if vitals.heart_rate is not None:
                 self._hr_history.append(vitals.heart_rate)
             if vitals.respiratory_rate is not None:
                 self._rr_history.append(vitals.respiratory_rate)
 
             result.message = f"Quality: {quality.overall_level.value}"
+            quality.is_acceptable = True
 
         # Prepare spectrum for frontend
         freqs, power, _ = self.signal_processor.compute_fft(

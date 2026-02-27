@@ -37,8 +37,8 @@ class ROIConfig:
 @dataclass
 class SignalConfig:
     """Signal processing parameters."""
-    buffer_size: int = 300       # ~10 seconds at 30fps
-    min_buffer_size: int = 90    # ~3 seconds minimum for analysis
+    buffer_size: int = 200       # ~10 seconds at 20fps
+    min_buffer_size: int = 60    # ~3 seconds minimum to start showing results
     pos_window: int = 32         # POS algorithm temporal window
     detrend_lambda: float = 300  # Detrending smoothness parameter
 
@@ -61,7 +61,7 @@ class FilterConfig:
 class FFTConfig:
     """FFT and peak detection settings."""
     zero_pad_factor: int = 4     # Zero-padding multiplier for FFT
-    peak_prominence: float = 0.1  # Minimum peak prominence
+    peak_prominence: float = 0.05  # Lowered from 0.1 for higher sensitivity
     peak_distance_hz: float = 0.3  # Minimum distance between peaks in Hz
 
 
