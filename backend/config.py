@@ -39,7 +39,7 @@ class SignalConfig:
     """Signal processing parameters."""
     buffer_size: int = 150       # ~7.5 seconds at 20fps
     min_buffer_size: int = 40    # ~2 seconds minimum to start showing results
-    pos_window: int = 20         # Reduced POS algorithm temporal window for faster output
+    pos_window: int = 30         # Temporal window >= 1 heartbeat for stable processing
     detrend_lambda: float = 300  # Detrending smoothness parameter
 
 

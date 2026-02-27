@@ -191,12 +191,15 @@ class RPPGEngine:
         if quality.overall_level == SignalQualityLevel.REJECTED:
             result.message = "Signal quality too low. Please sit still and ensure good lighting."
             quality.is_acceptable = False
+            self.signal_processor._consecutive_rejections += 1
             
             # If rejected too many times, auto-reset
             if self.signal_processor._consecutive_rejections > 50:
                 logger.info("Auto-resetting buffers due to persistent rejection")
                 self.reset()
         else:
+            self.signal_processor._consecutive_rejections = 0
+            
             # For POOR, FAIR, GOOD, EXCELLENT, we show the readings
             if vitals.heart_rate is not None:
                 self._hr_history.append(vitals.heart_rate)
@@ -291,19 +294,16 @@ class RPPGEngine:
 
     def _estimate_motion(self, frame: np.ndarray):
         """
-        Estimate motion using optical flow magnitude.
+        Estimate motion using simple frame differencing for speed.
         High motion indicates potential artifacts.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (160, 120))  # Downsample for speed
+        gray = cv2.resize(gray, (80, 60))  # Downsample heavily for speed
 
         if self._prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(
-                self._prev_gray, gray,
-                None, 0.5, 3, 15, 3, 5, 1.2, 0
-            )
-            magnitude = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
-            self._motion_score = float(np.mean(magnitude))
+            # Simple absolute difference instead of expensive optical flow
+            diff = cv2.absdiff(self._prev_gray, gray)
+            self._motion_score = float(np.mean(diff))
         else:
             self._motion_score = 0.0
 
