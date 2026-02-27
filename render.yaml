@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: face-senceing
+    env: docker
+    plan: free # Higher plan recommended for rPPG processing
+    region: oregon
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: RPPG_FPS
+        value: "30"
+      - key: RPPG_CORS_ORIGINS
+        value: "*" # Change this to your frontend URL after deployment
+      - key: PYTHONUNBUFFERED
+        value: "1"

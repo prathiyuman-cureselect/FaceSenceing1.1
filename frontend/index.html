@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis. Measures heart rate, respiratory rate, HRV, and SpO2 contactlessly.">
+    <meta name="theme-color" content="#0a0e1a">
+    <title>rPPG Vital Signs Monitor — Clinical Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫀</text></svg>">
+</head>
+
+<body>
+
+    <!-- ═══ Startup Overlay ═══ -->
+    <div class="startup-overlay" id="startupOverlay">
+        <div class="startup-content">
+            <div class="startup-icon">🫀</div>
+            <h2>rPPG Vital Monitor</h2>
+            <p>
+                Contactless vital sign measurement using facial video analysis.
+                Position your face clearly in the camera and remain still.
+            </p>
+            <div class="startup-features">
+                <span class="feature-chip">💓 Heart Rate</span>
+                <span class="feature-chip">🌬️ Respiratory Rate</span>
+                <span class="feature-chip">📊 HRV Analysis</span>
+                <span class="feature-chip">🩸 SpO2 Estimate</span>
+                <span class="feature-chip">🛡️ Signal Quality</span>
+                <span class="feature-chip">🧠 POS Algorithm</span>
+            </div>
+            <button class="btn btn-primary" id="btnStart" style="width: 100%; padding: 14px 28px; font-size: 1rem;">
+                🎥 Start Camera & Begin Analysis
+            </button>
+            <p style="margin-top: 16px; font-size: 0.72rem; color: var(--text-dim);">
+                Requires camera access. For research and informational use only.
+            </p>
+        </div>
+    </div>
+
+    <!-- ═══ Top Navigation Bar ═══ -->
+    <nav class="top-bar" id="topBar">
+        <div class="brand">
+            <div class="brand-icon"><span class="heartbeat-icon">🫀</span></div>
+            <div>
+                <h1>rPPG Vital Monitor</h1>
+                <span>Clinical Dashboard v1.0</span>
+            </div>
+        </div>
+        <div class="top-bar-right">
+            <div class="fps-badge" id="fpsBadge">0 FPS</div>
+            <div class="session-badge">
+                <span class="dot" id="sessionDot"></span>
+                <span id="sessionLabel">Disconnected</span>
+            </div>
+        </div>
+    </nav>
+    <!-- ═══ Main Dashboard ═══ -->
+    <main class="app-container">
+
+        <!-- Message Bar -->
+        <div class="message-bar" id="messageBar">
+            <span class="icon">ℹ️</span>
+            <span id="messageText">Click "Start Camera" to begin vital sign analysis.</span>
+        </div>
+
+        <!-- ─── Video Feed ─── -->
+        <section class="card video-section" id="videoSection">
+            <div class="card-header">
+                <span class="card-title"><span class="icon">📹</span> Live Camera Feed</span>
+                <div class="controls">
+                    <button class="btn btn-ghost" id="btnReset" title="Reset buffers">↻ Reset</button>
+                    <button class="btn btn-danger" id="btnStop" title="Stop analysis">⏹ Stop</button>
+                </div>
+            </div>
+            <div class="video-wrapper" id="videoWrapper">
+                <video id="videoFeed" autoplay playsinline muted></video>
+                <canvas id="canvasHidden"></canvas>
+                <div class="video-overlay">
+                    <div class="scan-line"></div>
+                </div>
+                <div class="video-status">
+                    <div class="status-chip recording" id="recChip" style="display:none;">
+                        <span class="rec-dot"></span> ANALYZING
+                    </div>
+                    <div class="status-chip quality" id="qualityChip">
+                        <span id="qualityChipText">—</span>
+                    </div>
+                </div>
+            </div>
+            <div class="buffer-bar">
+                <div class="buffer-fill" id="bufferFill" style="width: 0%"></div>
+            </div>
+            <div class="buffer-label" id="bufferLabel">Buffer: 0%</div>
+        </section>
+
+        <!-- ─── Vital Signs Grid ─── -->
+        <section class="vitals-grid" id="vitalsGrid">
+
+            <!-- Heart Rate -->
+            <div class="vital-card hr" id="cardHR">
+                <span class="vital-label"><span class="icon">❤️</span> Heart Rate</span>
+                <div class="vital-value inactive" id="hrValue">--</div>
+                <span class="vital-unit">BPM</span>
+                <div class="vital-sparkline"><canvas id="sparklineHR" width="200" height="36"></canvas></div>
+            </div>
+
+            <!-- Respiratory Rate -->
+            <div class="vital-card rr" id="cardRR">
+                <span class="vital-label"><span class="icon">🌬️</span> Resp. Rate</span>
+                <div class="vital-value inactive" id="rrValue">--</div>
+                <span class="vital-unit">br/min</span>
+                <div class="vital-sparkline"><canvas id="sparklineRR" width="200" height="36"></canvas></div>
+            </div>
+
+            <!-- HRV -->
+            <div class="vital-card hrv" id="cardHRV">
+                <span class="vital-label"><span class="icon">📊</span> HRV (RMSSD)</span>
+                <div class="vital-value inactive" id="hrvValue">--</div>
+                <span class="vital-unit">ms</span>
+                <div class="hrv-detail-row">
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">SDNN</div>
+                        <div class="hrv-metric-value" id="sdnnValue">--</div>
+                    </div>
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">pNN50</div>
+                        <div class="hrv-metric-value" id="pnn50Value">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SpO2 -->
+            <div class="vital-card spo2" id="cardSpO2">
+                <span class="vital-label"><span class="icon">🩸</span> SpO2</span>
+                <div class="vital-value inactive" id="spo2Value">--</div>
+                <span class="vital-unit">% (Trend)</span>
+                <div style="font-size: 0.6rem; color: var(--text-dim); margin-top: 10px;">Trend-based estimate</div>
+            </div>
+
+            <!-- Blood Pressure (Estimated) -->
+            <div class="vital-card hr" id="cardBP" style="border-top: 3px solid #f87171;">
+                <span class="vital-label"><span class="icon">🩺</span> Blood Pressure</span>
+                <div class="vital-value inactive" id="bpValue">--</div>
+                <span class="vital-unit">mmHg (Est.)</span>
+                <div class="hrv-detail-row">
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label" style="color:#ef4444">SYS</div>
+                        <div class="hrv-metric-value" id="sysValue">--</div>
+                    </div>
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label" style="color:#fca5a5">DIA</div>
+                        <div class="hrv-metric-value" id="diaValue">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stress & Balance -->
+            <div class="vital-card hrv" id="cardStress" style="border-top: 3px solid #f5d0fe;">
+                <span class="vital-label"><span class="icon">🧠</span> Stress & ANS</span>
+                <div class="vital-value inactive" id="stressValue">--</div>
+                <span class="vital-unit">Index (SI)</span>
+                <div class="hrv-detail-row">
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">LF/HF</div>
+                        <div class="hrv-metric-value" id="lfhfValue">--</div>
+                    </div>
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">ANS</div>
+                        <div class="hrv-metric-value" id="balanceStatus" style="font-size: 0.6rem;">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wellness (Temp & Perfusion) -->
+            <div class="vital-card spo2" id="cardWellness" style="border-top: 3px solid #fbbf24;">
+                <span class="vital-label"><span class="icon">🌡️</span> Skin Stats</span>
+                <div class="hrv-detail-row" style="grid-template-columns: 1fr 1fr;">
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">Temp</div>
+                        <div class="hrv-metric-value" id="tempValue" style="color: #fbbf24;">--</div>
+                        <div style="font-size: 0.5rem; color: #94a3b8;">°C</div>
+                    </div>
+                    <div class="hrv-metric">
+                        <div class="hrv-metric-label">Perfusion</div>
+                        <div class="hrv-metric-value" id="piValue" style="color: #fbbf24;">--</div>
+                        <div style="font-size: 0.5rem; color: #94a3b8;">PI%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Signal Quality ─── -->
+        <section class="card quality-section" id="qualitySection">
+            <div class="card-header">
+                <span class="card-title"><span class="icon">🛡️</span> Signal Quality Index</span>
+                <span class="quality-level-badge rejected" id="sqiLevelBadge">
+                    <span id="sqiLevelText">WAITING</span>
+                </span>
+            </div>
+            <div class="quality-meters">
+                <!-- SNR -->
+                <div class="quality-meter">
+                    <div class="quality-meter-label">SNR</div>
+                    <div class="quality-ring" id="ringSnr">
+                        <svg viewBox="0 0 64 64">
+                            <circle class="bg" cx="32" cy="32" r="28"></circle>
+                            <circle class="fg" cx="32" cy="32" r="28" stroke-dasharray="175.93"
+                                stroke-dashoffset="175.93" stroke="var(--quality-rejected)" id="ringSnrFg"></circle>
+                        </svg>
+                        <div class="quality-ring-value" id="snrValue">0</div>
+                    </div>
+                    <div style="font-size:0.65rem; color: var(--text-dim);">dB</div>
+                </div>
+                <!-- Spectral Purity -->
+                <div class="quality-meter">
+                    <div class="quality-meter-label">Spectral</div>
+                    <div class="quality-ring" id="ringSpectral">
+                        <svg viewBox="0 0 64 64">
+                            <circle class="bg" cx="32" cy="32" r="28"></circle>
+                            <circle class="fg" cx="32" cy="32" r="28" stroke-dasharray="175.93"
+                                stroke-dashoffset="175.93" stroke="var(--quality-rejected)" id="ringSpectralFg">
+                            </circle>
+                        </svg>
+                        <div class="quality-ring-value" id="spectralValue">0</div>
+                    </div>
+                    <div style="font-size:0.65rem; color: var(--text-dim);">purity</div>
+                </div>
+                <!-- Motion -->
+                <div class="quality-meter">
+                    <div class="quality-meter-label">Motion</div>
+                    <div class="quality-ring" id="ringMotion">
+                        <svg viewBox="0 0 64 64">
+                            <circle class="bg" cx="32" cy="32" r="28"></circle>
+                            <circle class="fg" cx="32" cy="32" r="28" stroke-dasharray="175.93"
+                                stroke-dashoffset="175.93" stroke="var(--quality-rejected)" id="ringMotionFg"></circle>
+                        </svg>
+                        <div class="quality-ring-value" id="motionValue">0</div>
+                    </div>
+                    <div style="font-size:0.65rem; color: var(--text-dim);">score</div>
+                </div>
+                <!-- Face Confidence -->
+                <div class="quality-meter">
+                    <div class="quality-meter-label">Face</div>
+                    <div class="quality-ring" id="ringFace">
+                        <svg viewBox="0 0 64 64">
+                            <circle class="bg" cx="32" cy="32" r="28"></circle>
+                            <circle class="fg" cx="32" cy="32" r="28" stroke-dasharray="175.93"
+                                stroke-dashoffset="175.93" stroke="var(--quality-rejected)" id="ringFaceFg"></circle>
+                        </svg>
+                        <div class="quality-ring-value" id="faceValue">0</div>
+                    </div>
+                    <div style="font-size:0.65rem; color: var(--text-dim);">conf</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Charts ─── -->
+        <div class="charts-section">
+            <div class="chart-container card">
+                <div class="card-header">
+                    <span class="card-title"><span class="icon">〰️</span> rPPG Pulse Signal</span>
+                </div>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartSignal"></canvas>
+                </div>
+            </div>
+            <div class="chart-container card">
+                <div class="card-header">
+                    <span class="card-title"><span class="icon">📈</span> Power Spectrum (FFT)</span>
+                </div>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartSpectrum"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══ Session Summary Modal ═══ -->
+    <div class="modal-backdrop" id="summaryModal">
+        <div class="modal">
+            <h3>📋 Session Summary</h3>
+            <div class="summary-grid" id="summaryGrid">
+                <!-- Populated dynamically -->
+            </div>
+            <button class="btn btn-primary" id="btnCloseSummary" style="width:100%;">Close</button>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
