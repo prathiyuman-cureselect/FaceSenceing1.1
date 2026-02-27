@@ -160,7 +160,7 @@ async def lifespan(app: FastAPI):
 from fastapi.middleware.gzip import GZipMiddleware
 
 app = FastAPI(
-    title="rPPG Vital Signs Monitor",
+    title="TelegarudaAI",
     description="Remote Photoplethysmography pipeline for contactless vital sign measurement",
     version="1.0.0",
     lifespan=lifespan,
@@ -213,6 +213,7 @@ frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fronten
 if os.path.exists(frontend_dir):
     app.mount("/css", StaticFiles(directory=os.path.join(frontend_dir, "css")), name="css")
     app.mount("/js", StaticFiles(directory=os.path.join(frontend_dir, "js")), name="js")
+    app.mount("/asserts", StaticFiles(directory=os.path.join(frontend_dir, "asserts")), name="asserts")
 
 
 # ─── REST Endpoints ───────────────────────────────────────────────────

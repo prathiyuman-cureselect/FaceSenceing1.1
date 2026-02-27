@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * rPPG Vital Signs Monitor — Frontend Application
+ * TelegarudaAI — Frontend Application
  * ═══════════════════════════════════════════════════════════════════════
  * 
  * Real-time camera capture → WebSocket → rPPG Backend → Dashboard
