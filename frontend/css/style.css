@@ -346,6 +346,41 @@ body::before {
     pointer-events: none;
 }
 
+.face-guide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 260px;
+    height: 380px;
+    border: 3px dashed rgba(255, 255, 255, 0.7);
+    border-radius: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all var(--transition-normal);
+}
+
+.video-wrapper.face-detected .face-guide {
+    border-color: rgba(16, 185, 129, 0.6);
+}
+
+.face-guide span {
+    position: absolute;
+    bottom: -35px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: white;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
+.video-wrapper.face-detected .face-guide span {
+    color: #10b981;
+}
+
 .video-overlay .scan-line {
     position: absolute;
     top: 0;

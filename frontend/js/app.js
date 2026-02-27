@@ -87,6 +87,7 @@ const DOM = {
     videoFeed: document.getElementById('videoFeed'),
     canvas: document.getElementById('canvasHidden'),
     videoWrapper: document.getElementById('videoWrapper'),
+    faceGuideText: document.querySelector('#faceGuide span'),
     recChip: document.getElementById('recChip'),
     qualityChip: document.getElementById('qualityChip'),
     qualityChipText: document.getElementById('qualityChipText'),
@@ -418,6 +419,14 @@ function handleMeasurement(data) {
     DOM.videoWrapper.classList.toggle('face-detected', data.face_detected);
     DOM.videoWrapper.classList.toggle('no-face', !data.face_detected);
 
+    if (DOM.faceGuideText) {
+        if (data.face_detected) {
+            DOM.faceGuideText.textContent = "Face Detected - Hold Still";
+        } else {
+            DOM.faceGuideText.textContent = "Please put your face within the frame";
+        }
+    }
+
     // Buffer progress
     DOM.bufferFill.style.width = `${data.buffer_fill}%`;
     DOM.bufferLabel.textContent = `Buffer: ${data.buffer_fill.toFixed(0)}%`;
@@ -437,8 +446,8 @@ function handleMeasurement(data) {
     updateQuality(data.quality);
 
     // Charts
-    if (data.signal && data.signal.length > 0) {
-        state.signalData = data.signal;
+    if (data.raw_signal && data.raw_signal.length > 0) {
+        state.signalData = data.raw_signal;
         drawSignalChart();
     }
 

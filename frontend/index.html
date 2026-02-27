@@ -8,7 +8,7 @@
         content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis. Measures heart rate, respiratory rate, HRV, and SpO2 contactlessly.">
     <meta name="theme-color" content="#0a0e1a">
     <title>rPPG Vital Signs Monitor — Clinical Dashboard</title>
-    <link rel="stylesheet" href="css/style.css?v=3">
+    <link rel="stylesheet" href="css/style.css?v=4">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫀</text></svg>">
 </head>
@@ -80,6 +80,9 @@
                 <video id="videoFeed" autoplay playsinline muted></video>
                 <canvas id="canvasHidden"></canvas>
                 <div class="video-overlay">
+                    <div class="face-guide" id="faceGuide">
+                        <span>Please put your face within the frame</span>
+                    </div>
                     <div class="scan-line"></div>
                 </div>
                 <div class="video-status">
@@ -290,7 +293,7 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=3"></script>
+    <script src="js/app.js?v=4"></script>
 </body>
 
 </html>
