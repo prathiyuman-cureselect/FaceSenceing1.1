@@ -37,9 +37,9 @@ class ROIConfig:
 @dataclass
 class SignalConfig:
     """Signal processing parameters."""
-    buffer_size: int = 200       # ~10 seconds at 20fps
-    min_buffer_size: int = 60    # ~3 seconds minimum to start showing results
-    pos_window: int = 32         # POS algorithm temporal window
+    buffer_size: int = 150       # ~7.5 seconds at 20fps
+    min_buffer_size: int = 40    # ~2 seconds minimum to start showing results
+    pos_window: int = 20         # Reduced POS algorithm temporal window for faster output
     detrend_lambda: float = 300  # Detrending smoothness parameter
 
 

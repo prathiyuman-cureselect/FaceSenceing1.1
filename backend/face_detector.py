@@ -231,6 +231,14 @@ class FaceDetector:
                     signals.append(np.array([r, g, b]))
 
         if not signals:
+            # Ultimate fallback: just return the mean of the entire face bounding box
+            x, y, w, h = face_rect
+            face_roi = frame[y:y+h, x:x+w]
+            if face_roi.size > 0:
+                r = np.mean(face_roi[:, :, 2])
+                g = np.mean(face_roi[:, :, 1])
+                b = np.mean(face_roi[:, :, 0])
+                return np.array([r, g, b])
             return None
 
         # Average across ROIs

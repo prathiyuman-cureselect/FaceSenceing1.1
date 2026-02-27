@@ -127,7 +127,7 @@ class RPPGEngine:
         rgb_array = np.array(self._rgb_buffer)
         pulse_signal = self._pos_algorithm(rgb_array)
 
-        if pulse_signal is None or len(pulse_signal) < 30:
+        if pulse_signal is None or len(pulse_signal) < 20:
             result.message = "Insufficient signal quality for POS extraction."
             return result
 
