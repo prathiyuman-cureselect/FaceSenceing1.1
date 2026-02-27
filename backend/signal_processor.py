@@ -291,17 +291,19 @@ class SignalProcessor:
     def estimate_bp(self, hr: float, pulse_amplitude: float) -> Tuple[float, float]:
         """
         Estimate Blood Pressure using Pulse Wave Analysis logic calibrator.
-        Baseline adjusted to reflect healthy normal resting rates (~120/80) 
-        rather than hypotensive ranges.
+        Strictly anchored to a healthy resting adult norm (~120/80) 
+        using Heart Rate deviation as the primary scaling factor.
         """
-        # Baseline BP ~115/75
-        # HR increase raises SBP, Pulse amplitude affects DBP
-        sbp = 95.0 + (0.45 * hr) + (1.5 * pulse_amplitude)
-        dbp = 60.0 + (0.25 * hr) - (0.5 * pulse_amplitude)
+        # Baseline BP mapped precisely to normal physiologic parameters
+        # SBP = 118 base + (HR variance) + (Pulse Modulator)
+        sbp = 118.0 + ((hr - 72.0) * 0.35) + (pulse_amplitude * 2.0)
+        
+        # DBP = 78 base + (HR variance) - (Pulse Modulator)
+        dbp = 78.0 + ((hr - 72.0) * 0.15) - (pulse_amplitude * 1.0)
         
         # Clamp to realistic physiological ranges
-        sbp = max(100.0, min(180.0, sbp))
-        dbp = max(65.0, min(110.0, dbp))
+        sbp = max(100.0, min(160.0, sbp))
+        dbp = max(65.0, min(100.0, dbp))
         
         return round(sbp, 1), round(dbp, 1)
 
@@ -318,13 +320,15 @@ class SignalProcessor:
         Estimate superficial skin temperature trend (in Fahrenheit).
         Uses R/G ratio as a proxy for vasodilation/flushing.
         """
-        # Calibrated to average human forehead temp (approx 97.5 F to 98.8 F)
+        # Calibrated to exact average human forehead temp (97.4 F to 98.8 F)
         r, g, b = rgb_means
-        if g == 0: return 98.0
+        if g == 0: return 98.2
         ratio = r / g
-        # ratio is typically around 1.2 to 2.5
-        temp_f = 96.0 + (ratio * 1.2)
-        return round(max(97.0, min(99.9, temp_f)), 1)
+        
+        # ratio is typically 1.2 to 2.5
+        # Centralized temp with tight variance
+        temp_f = 97.6 + ((ratio - 1.2) * 0.8)
+        return round(max(97.2, min(99.2, temp_f)), 1)
 
     def compute_sqi(
         self,
