@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: face-senceing
+    name: telegaruda-ai
     env: docker
     plan: free # Higher plan recommended for rPPG processing
     region: oregon
