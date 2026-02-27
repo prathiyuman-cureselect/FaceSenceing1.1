@@ -1,0 +1,237 @@
+"""
+Face Detector Module
+=====================
+Robust face detection using OpenCV's DNN-based face detector
+with ROI extraction for forehead and cheek regions.
+"""
+
+import logging
+from typing import Optional, Tuple
+
+import cv2
+import numpy as np
+
+from config import CONFIG
+
+logger = logging.getLogger(__name__)
+
+
+class FaceDetector:
+    """
+    Face detection and ROI extraction using OpenCV DNN or Haar Cascade.
+    Provides stable face tracking with smoothing to reduce jitter.
+    """
+
+    def __init__(self):
+        self.config = CONFIG.roi
+        self._prev_face_rect: Optional[Tuple[int, int, int, int]] = None
+        self._smooth_alpha = 0.3  # Exponential smoothing factor
+        self._no_face_count = 0
+        self._max_no_face = 10  # Frames before resetting tracker
+        self._frame_count = 0
+        self._detect_every_n_frames = 3  # Detect every 3 frames if stable
+        self._last_confidence = 0.0
+
+        # Try DNN face detector first, fallback to Haar cascade
+        self._use_dnn = False
+        try:
+            self._net = cv2.dnn.readNetFromCaffe(
+                "deploy.prototxt",
+                "res10_300x300_ssd_iter_140000.caffemodel"
+            )
+            self._use_dnn = True
+            logger.info("Using DNN face detector")
+        except Exception:
+            logger.info("DNN model not found, using Haar cascade")
+            self._cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            )
+
+    def detect_face(
+        self, frame: np.ndarray
+    ) -> Tuple[Optional[Tuple[int, int, int, int]], float]:
+        """
+        Detect face in frame with optimization to skip detection on stable tracks.
+
+        Returns:
+            Tuple of (face_rect, confidence) where face_rect is (x, y, w, h)
+            or (None, 0.0) if no face detected.
+        """
+        self._frame_count += 1
+
+        # If we have a stable track, skip some detections to save CPU
+        if (
+            self._prev_face_rect is not None
+            and self._last_confidence > 0.7
+            and self._frame_count % self._detect_every_n_frames != 0
+        ):
+            return self._prev_face_rect, self._last_confidence
+
+        if self._use_dnn:
+            rect, conf = self._detect_dnn(frame)
+        else:
+            rect, conf = self._detect_haar(frame)
+            
+        self._last_confidence = conf
+        return rect, conf
+
+    def _detect_dnn(
+        self, frame: np.ndarray
+    ) -> Tuple[Optional[Tuple[int, int, int, int]], float]:
+        """DNN-based face detection."""
+        h, w = frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(
+            cv2.resize(frame, (300, 300)), 1.0, (300, 300),
+            (104.0, 177.0, 123.0)
+        )
+        self._net.setInput(blob)
+        detections = self._net.forward()
+
+        best_conf = 0.0
+        best_rect = None
+
+        for i in range(detections.shape[2]):
+            confidence = float(detections[0, 0, i, 2])
+            if confidence > 0.5:
+                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                x1, y1, x2, y2 = box.astype(int)
+                face_w = x2 - x1
+                face_h = y2 - y1
+                if face_w >= self.config.min_face_size and confidence > best_conf:
+                    best_conf = confidence
+                    best_rect = (x1, y1, face_w, face_h)
+
+        return self._smooth_rect(best_rect), best_conf
+
+    def _detect_haar(
+        self, frame: np.ndarray
+    ) -> Tuple[Optional[Tuple[int, int, int, int]], float]:
+        """Haar cascade face detection."""
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+
+        faces = self._cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(self.config.min_face_size, self.config.min_face_size),
+            flags=cv2.CASCADE_SCALE_IMAGE
+        )
+
+        if len(faces) == 0:
+            return self._smooth_rect(None), 0.0
+
+        # Select largest face
+        areas = [w * h for (x, y, w, h) in faces]
+        idx = np.argmax(areas)
+        face_rect = tuple(faces[idx])
+        confidence = min(0.9, 0.5 + len(faces) * 0.1)
+
+        return self._smooth_rect(face_rect), confidence
+
+    def _smooth_rect(
+        self, rect: Optional[Tuple[int, int, int, int]]
+    ) -> Optional[Tuple[int, int, int, int]]:
+        """Apply exponential smoothing to reduce face bbox jitter."""
+        if rect is None:
+            self._no_face_count += 1
+            if self._no_face_count > self._max_no_face:
+                self._prev_face_rect = None
+            return self._prev_face_rect
+
+        self._no_face_count = 0
+
+        if self._prev_face_rect is None:
+            self._prev_face_rect = rect
+            return rect
+
+        alpha = self._smooth_alpha
+        smoothed = tuple(
+            int(alpha * new + (1 - alpha) * old)
+            for new, old in zip(rect, self._prev_face_rect)
+        )
+        self._prev_face_rect = smoothed
+        return smoothed
+
+    def extract_roi(
+        self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extract forehead and cheek ROIs from detected face.
+
+        Returns:
+            Tuple of (forehead_roi, cheek_roi) as BGR images.
+        """
+        x, y, w, h = face_rect
+
+        # Forehead region
+        fh_y1 = max(0, y + int(h * self.config.forehead_ratio_top))
+        fh_y2 = y + int(h * self.config.forehead_ratio_bottom)
+        fh_x1 = max(0, x + int(w * self.config.forehead_ratio_left))
+        fh_x2 = x + int(w * self.config.forehead_ratio_right)
+
+        # Cheek region
+        ck_y1 = y + int(h * self.config.cheek_ratio_top)
+        ck_y2 = min(frame.shape[0], y + int(h * self.config.cheek_ratio_bottom))
+        ck_x1 = max(0, x + int(w * self.config.cheek_ratio_left))
+        ck_x2 = min(frame.shape[1], x + int(w * self.config.cheek_ratio_right))
+
+        forehead = frame[fh_y1:fh_y2, fh_x1:fh_x2]
+        cheek = frame[ck_y1:ck_y2, ck_x1:ck_x2]
+
+        return forehead, cheek
+
+    def get_skin_mask(self, roi: np.ndarray) -> np.ndarray:
+        """
+        Create skin-color mask using YCrCb color space.
+        Filters out non-skin pixels for more accurate color averaging.
+        """
+        if roi.size == 0:
+            return np.array([])
+
+        ycrcb = cv2.cvtColor(roi, cv2.COLOR_BGR2YCrCb)
+        mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
+
+        # Morphological cleanup
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        return mask
+
+    def extract_rgb_signal(
+        self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
+    ) -> Optional[np.ndarray]:
+        """
+        Extract mean RGB values from skin-masked ROI.
+
+        Returns:
+            np.ndarray of shape (3,) with [R, G, B] means, or None if invalid.
+        """
+        forehead, cheek = self.extract_roi(frame, face_rect)
+
+        signals = []
+        for roi in [forehead, cheek]:
+            if roi.size == 0:
+                continue
+            mask = self.get_skin_mask(roi)
+            if mask.size == 0 or np.count_nonzero(mask) < 20:
+                continue
+
+            masked = cv2.bitwise_and(roi, roi, mask=mask)
+            # BGR -> RGB mean
+            b = np.mean(masked[:, :, 0][mask > 0])
+            g = np.mean(masked[:, :, 1][mask > 0])
+            r = np.mean(masked[:, :, 2][mask > 0])
+            signals.append(np.array([r, g, b]))
+
+        if not signals:
+            return None
+
+        # Average across ROIs
+        return np.mean(signals, axis=0)
+
+    def reset(self):
+        """Reset tracker state."""
+        self._prev_face_rect = None
+        self._no_face_count = 0
