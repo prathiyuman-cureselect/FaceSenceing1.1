@@ -64,6 +64,8 @@ const state = {
     isRunning: false,
     reconnectAttempts: 0,
     reconnectTimer: null,
+    scanTimerInterval: null,
+    timeLeft: 30,
 
     // Vital histories (for sparklines)
     hrHistory: [],
@@ -89,6 +91,8 @@ const DOM = {
     videoWrapper: document.getElementById('videoWrapper'),
     faceGuideText: document.querySelector('#faceGuide span'),
     recChip: document.getElementById('recChip'),
+    timerChip: document.getElementById('timerChip'),
+    timerText: document.getElementById('timerText'),
     qualityChip: document.getElementById('qualityChip'),
     qualityChipText: document.getElementById('qualityChipText'),
 
@@ -339,6 +343,25 @@ function startFrameCapture() {
         const message = JSON.stringify({ frame: dataUrl });
         state.ws.send(message);
     }, CONFIG.FRAME_INTERVAL_MS);
+
+    // Start UI Scan Timer
+    state.timeLeft = 35; // 35 seconds to allow 2-3s buffer + 30s scan
+    if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
+    if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
+    if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
+
+    state.scanTimerInterval = setInterval(() => {
+        state.timeLeft--;
+        if (state.timeLeft <= 0) {
+            clearInterval(state.scanTimerInterval);
+            if (DOM.timerText) DOM.timerText.textContent = `⏱️ Done!`;
+            if (DOM.timerChip) DOM.timerChip.style.background = '#059669'; // Green success
+            // Optional: Auto stop session when timer completes
+            // stopSession(); 
+        } else {
+            if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
+        }
+    }, 1000);
 }
 
 function stopFrameCapture() {
@@ -346,7 +369,12 @@ function stopFrameCapture() {
         clearInterval(state.captureInterval);
         state.captureInterval = null;
     }
+    if (state.scanTimerInterval) {
+        clearInterval(state.scanTimerInterval);
+        state.scanTimerInterval = null;
+    }
     DOM.recChip.style.display = 'none';
+    if (DOM.timerChip) DOM.timerChip.style.display = 'none';
 }
 
 // ─── Session Control ──────────────────────────────────────────────────

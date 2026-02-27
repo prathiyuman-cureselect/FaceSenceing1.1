@@ -8,7 +8,7 @@
         content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis. Measures heart rate, respiratory rate, HRV, and SpO2 contactlessly.">
     <meta name="theme-color" content="#0a0e1a">
     <title>TelegarudaAI — Clinical Dashboard</title>
-    <link rel="stylesheet" href="css/style.css?v=9">
+    <link rel="stylesheet" href="css/style.css?v=10">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫀</text></svg>">
 </head>
@@ -88,6 +88,10 @@
                 <div class="video-status">
                     <div class="status-chip recording" id="recChip" style="display:none;">
                         <span class="rec-dot"></span> ANALYZING
+                    </div>
+                    <div class="status-chip timer" id="timerChip"
+                        style="display:none; background: #0f172a; color: white;">
+                        <span id="timerText">⏱️ 30s</span>
                     </div>
                     <div class="status-chip quality" id="qualityChip">
                         <span id="qualityChipText">—</span>
@@ -185,7 +189,7 @@
                     <div class="hrv-metric">
                         <div class="hrv-metric-label">Temp</div>
                         <div class="hrv-metric-value" id="tempValue" style="color: #fbbf24;">--</div>
-                        <div style="font-size: 0.5rem; color: #94a3b8;">°C</div>
+                        <div style="font-size: 0.5rem; color: #94a3b8;">°F</div>
                     </div>
                     <div class="hrv-metric">
                         <div class="hrv-metric-label">Perfusion</div>
@@ -293,7 +297,7 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=9"></script>
+    <script src="js/app.js?v=10"></script>
 </body>
 
 </html>

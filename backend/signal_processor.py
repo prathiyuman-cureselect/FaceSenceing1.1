@@ -290,19 +290,18 @@ class SignalProcessor:
 
     def estimate_bp(self, hr: float, pulse_amplitude: float) -> Tuple[float, float]:
         """
-        Estimate Blood Pressure using Pulse Wave Analysis logic.
-        Since we have single sensor, we use a calibrated linear model 
-        based on HR and Pulse Amplitude (Perfusion).
+        Estimate Blood Pressure using Pulse Wave Analysis logic calibrator.
+        Baseline adjusted to reflect healthy normal resting rates (~120/80) 
+        rather than hypotensive ranges.
         """
-        # Baseline BP 120/80
-        # HR increase usually raises SBP
-        # Amplitude (vasodilation) affects DBP
-        sbp = 80 + (0.5 * hr) + (2.0 * pulse_amplitude)
-        dbp = 50 + (0.4 * hr) - (1.0 * pulse_amplitude)
+        # Baseline BP ~115/75
+        # HR increase raises SBP, Pulse amplitude affects DBP
+        sbp = 95.0 + (0.45 * hr) + (1.5 * pulse_amplitude)
+        dbp = 60.0 + (0.25 * hr) - (0.5 * pulse_amplitude)
         
         # Clamp to realistic physiological ranges
-        sbp = max(90, min(180, sbp))
-        dbp = max(60, min(110, dbp))
+        sbp = max(100.0, min(180.0, sbp))
+        dbp = max(65.0, min(110.0, dbp))
         
         return round(sbp, 1), round(dbp, 1)
 
@@ -316,15 +315,16 @@ class SignalProcessor:
 
     def estimate_skin_temp(self, rgb_means: np.ndarray) -> float:
         """
-        Estimate superficial skin temperature trend.
+        Estimate superficial skin temperature trend (in Fahrenheit).
         Uses R/G ratio as a proxy for vasodilation/flushing.
         """
-        # Calibrated to 36.5C base
+        # Calibrated to average human forehead temp (approx 97.5 F to 98.8 F)
         r, g, b = rgb_means
-        if g == 0: return 36.5
+        if g == 0: return 98.0
         ratio = r / g
-        temp = 34.0 + (ratio * 2.0)
-        return round(max(35.0, min(38.5, temp)), 1)
+        # ratio is typically around 1.2 to 2.5
+        temp_f = 96.0 + (ratio * 1.2)
+        return round(max(97.0, min(99.9, temp_f)), 1)
 
     def compute_sqi(
         self,
