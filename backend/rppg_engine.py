@@ -23,6 +23,7 @@ from face_detector import FaceDetector
 from models import (
     MeasurementResult,
     SignalQualityMetrics,
+    SignalQualityLevel,
     VitalSigns,
 )
 from signal_processor import SignalProcessor
