@@ -8,7 +8,7 @@
         content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis. Measures heart rate, respiratory rate, HRV, and SpO2 contactlessly.">
     <meta name="theme-color" content="#0a0e1a">
     <title>TelegarudaAI — Clinical Dashboard</title>
-    <link rel="stylesheet" href="css/style.css?v=10">
+    <link rel="stylesheet" href="css/style.css?v=11">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫀</text></svg>">
 </head>
@@ -30,6 +30,7 @@
                 <span class="feature-chip">Heart Rate</span>
                 <span class="feature-chip">Respiratory Rate</span>
                 <span class="feature-chip">Blood Pressure</span>
+                <span class="feature-chip">Body Temperature</span>
                 <span class="feature-chip">Stress Index</span>
             </div>
             <button class="btn btn-primary btn-start-custom" id="btnStart">
@@ -182,19 +183,15 @@
                 </div>
             </div>
 
-            <!-- Wellness (Temp & Perfusion) -->
-            <div class="vital-card spo2" id="cardWellness" style="border-top: 3px solid #fbbf24;">
-                <span class="vital-label"><span class="icon">🌡️</span> Skin Stats</span>
-                <div class="hrv-detail-row" style="grid-template-columns: 1fr 1fr;">
+            <!-- Body Temperature -->
+            <div class="vital-card spo2" id="cardTemp" style="border-top: 3px solid #fbbf24;">
+                <span class="vital-label"><span class="icon">🌡️</span> Body Temperature</span>
+                <div class="vital-value inactive" id="tempValue" style="color: #fbbf24;">--</div>
+                <span class="vital-unit">°F</span>
+                <div class="hrv-detail-row">
                     <div class="hrv-metric">
-                        <div class="hrv-metric-label">Temp</div>
-                        <div class="hrv-metric-value" id="tempValue" style="color: #fbbf24;">--</div>
-                        <div style="font-size: 0.5rem; color: #94a3b8;">°F</div>
-                    </div>
-                    <div class="hrv-metric">
-                        <div class="hrv-metric-label">Perfusion</div>
-                        <div class="hrv-metric-value" id="piValue" style="color: #fbbf24;">--</div>
-                        <div style="font-size: 0.5rem; color: #94a3b8;">PI%</div>
+                        <div class="hrv-metric-label">Perfusion Index</div>
+                        <div class="hrv-metric-value" id="piValue">--</div>
                     </div>
                 </div>
             </div>
@@ -297,7 +294,7 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=10"></script>
+    <script src="js/app.js?v=11"></script>
 </body>
 
 </html>

@@ -565,7 +565,10 @@ function updateVitals(vitals) {
     // Wellness (Temp & Perfusion)
     const tempEl = document.getElementById('tempValue');
     const piEl = document.getElementById('piValue');
-    if (vitals.skin_temp && tempEl) tempEl.textContent = vitals.skin_temp.toFixed(1);
+    if (vitals.skin_temp && tempEl) {
+        tempEl.textContent = vitals.skin_temp.toFixed(1);
+        tempEl.classList.remove('inactive');
+    }
     if (vitals.perfusion_index && piEl) piEl.textContent = vitals.perfusion_index.toFixed(1);
 }
 
