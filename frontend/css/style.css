@@ -897,7 +897,7 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: pulse-big 2s ease-in-out infinite;
+    position: relative;
 }
 
 .startup-logo {
@@ -906,16 +906,18 @@ body::before {
     object-fit: contain;
 }
 
-@keyframes pulse-big {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.08);
-    }
+.startup-ai-badge {
+    position: absolute;
+    top: -5px;
+    right: -15px;
+    background: var(--gradient-primary);
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-sm);
+    letter-spacing: 0.05em;
 }
 
 .startup-content h2 {
