@@ -54,6 +54,20 @@ class SignalProcessor:
         # Rejection tracking
         self._consecutive_rejections = 0
 
+    def update_fps(self, new_fps: float):
+        """Update FPS and re-design filters."""
+        self.fps = new_fps
+        self._hr_sos = self._design_bandpass(
+            self.filter_cfg.hr_low_freq,
+            self.filter_cfg.hr_high_freq,
+            self.filter_cfg.hr_filter_order
+        )
+        self._rr_sos = self._design_bandpass(
+            self.filter_cfg.rr_low_freq,
+            self.filter_cfg.rr_high_freq,
+            self.filter_cfg.rr_filter_order
+        )
+
     def _design_bandpass(
         self, low: float, high: float, order: int
     ) -> np.ndarray:

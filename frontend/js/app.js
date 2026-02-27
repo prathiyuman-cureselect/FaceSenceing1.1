@@ -24,8 +24,8 @@ const PORT = (HOSTNAME === 'localhost' || HOSTNAME.includes('192.168.')) ? ':800
 
 const CONFIG = {
     WS_URL: `${PROTOCOL}//${HOSTNAME}${PORT}/ws`,
-    FRAME_INTERVAL_MS: 100,       // ~10 fps capture rate to backend
-    JPEG_QUALITY: 0.7,             // JPEG compression quality
+    FRAME_INTERVAL_MS: 50,       // 20 fps capture rate for higher pulse resolution
+    JPEG_QUALITY: 0.6,             // Slightly lower quality to compensate for higher rate
     MAX_RECONNECT_ATTEMPTS: 10,
     RECONNECT_DELAY_MS: 2000,
     SPARKLINE_MAX_POINTS: 60,

@@ -92,6 +92,11 @@ class RPPGEngine:
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
             return result
 
+        # Dynamic FPS Adaptation: Update signal processor with real-world timing
+        if result.fps_actual > 5.0 and abs(self.signal_processor.fps - result.fps_actual) > 2.0:
+            logger.info(f"Adapting filters to actual FPS: {result.fps_actual}")
+            self.signal_processor.update_fps(result.fps_actual)
+
         # Step 2: Motion estimation
         self._estimate_motion(frame)
 

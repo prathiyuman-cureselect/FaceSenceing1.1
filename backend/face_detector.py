@@ -184,18 +184,18 @@ class FaceDetector:
     def get_skin_mask(self, roi: np.ndarray) -> np.ndarray:
         """
         Create skin-color mask using YCrCb color space.
-        Filters out non-skin pixels for more accurate color averaging.
+        Loosened range for better performance in clinical/home lighting.
         """
         if roi.size == 0:
             return np.array([])
 
         ycrcb = cv2.cvtColor(roi, cv2.COLOR_BGR2YCrCb)
-        mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
+        # Expanded range for Cr and Cb to handle varied skin tones and lighting
+        mask = cv2.inRange(ycrcb, (0, 130, 70), (255, 180, 135))
 
         # Morphological cleanup
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         return mask
 
@@ -203,10 +203,7 @@ class FaceDetector:
         self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
     ) -> Optional[np.ndarray]:
         """
-        Extract mean RGB values from skin-masked ROI.
-
-        Returns:
-            np.ndarray of shape (3,) with [R, G, B] means, or None if invalid.
+        Extract mean RGB values with skin-masking and fallback.
         """
         forehead, cheek = self.extract_roi(frame, face_rect)
 
@@ -214,16 +211,24 @@ class FaceDetector:
         for roi in [forehead, cheek]:
             if roi.size == 0:
                 continue
+                
             mask = self.get_skin_mask(roi)
-            if mask.size == 0 or np.count_nonzero(mask) < 20:
-                continue
-
-            masked = cv2.bitwise_and(roi, roi, mask=mask)
-            # BGR -> RGB mean
-            b = np.mean(masked[:, :, 0][mask > 0])
-            g = np.mean(masked[:, :, 1][mask > 0])
-            r = np.mean(masked[:, :, 2][mask > 0])
-            signals.append(np.array([r, g, b]))
+            
+            # If mask is good, use it (precise)
+            if mask.size > 0 and np.count_nonzero(mask) > 50:
+                b = np.mean(roi[:, :, 0][mask > 0])
+                g = np.mean(roi[:, :, 1][mask > 0])
+                r = np.mean(roi[:, :, 2][mask > 0])
+                signals.append(np.array([r, g, b]))
+            else:
+                # Fallback: Use center region of the ROI as it's likely skin
+                h, w = roi.shape[:2]
+                center_roi = roi[h//4:3*h//4, w//4:3*w//4]
+                if center_roi.size > 0:
+                    r = np.mean(center_roi[:, :, 2])
+                    g = np.mean(center_roi[:, :, 1])
+                    b = np.mean(center_roi[:, :, 0])
+                    signals.append(np.array([r, g, b]))
 
         if not signals:
             return None
