@@ -869,7 +869,7 @@ body::before {
 .startup-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 14, 26, 0.95);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     display: flex;
     flex-direction: column;
@@ -895,12 +895,12 @@ body::before {
     height: 100px;
     margin: 0 auto var(--space-xl);
     border-radius: 28px;
-    background: var(--gradient-heart);
+    background: var(--gradient-primary);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 48px;
-    box-shadow: 0 0 80px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 60px rgba(37, 99, 235, 0.3);
     animation: pulse-big 2s ease-in-out infinite;
 }
 
@@ -940,10 +940,25 @@ body::before {
 .feature-chip {
     padding: 6px 14px;
     border-radius: var(--radius-full);
-    background: var(--bg-glass);
+    background: var(--bg-card);
     border: 1px solid var(--bg-glass-border);
     font-size: 0.75rem;
     color: var(--text-secondary);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-start-custom {
+    width: 100%;
+    padding: 16px 28px;
+    font-size: 1.1rem;
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+.startup-disclaimer {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
 }
 
 /* ─── HRV Detail Row ─────────────────────────────────────────────── */
