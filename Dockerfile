@@ -16,7 +16,7 @@ RUN wget https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face
 WORKDIR /app
 
 # Copy requirements and install
-COPY backend/requirements.txt .
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend and frontend
