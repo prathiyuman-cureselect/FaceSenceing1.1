@@ -374,25 +374,23 @@ class SignalProcessor:
                     float(signal_power / total_power), 3
                 )
 
-        # Composite quality level
-        score = 0.0
-        if metrics.snr_db >= self.quality_cfg.sqi_snr_threshold:
-            score += 0.3
-        if metrics.spectral_purity >= self.quality_cfg.sqi_spectral_purity:
-            score += 0.25
-        if face_confidence >= self.quality_cfg.sqi_face_confidence:
-            score += 0.25
-        if motion_score < self.quality_cfg.sqi_motion_threshold:
-            score += 0.2
+        # Composite quality level (0.0 to 1.0)
+        # Weighting factors
+        w_snr = min(max((metrics.snr_db + 2) / 8, 0), 1) * 0.4
+        w_purity = min(max(metrics.spectral_purity / 0.4, 0), 1) * 0.3
+        w_face = min(max(face_confidence / 1.0, 0), 1) * 0.2
+        w_motion = max(0, 1 - (motion_score / 40.0)) * 0.1
+        
+        score = w_snr + w_purity + w_face + w_motion
 
         # Classify
-        if score >= 0.9:
+        if score >= 0.7:
             metrics.overall_level = SignalQualityLevel.EXCELLENT
-        elif score >= 0.7:
-            metrics.overall_level = SignalQualityLevel.GOOD
         elif score >= 0.5:
+            metrics.overall_level = SignalQualityLevel.GOOD
+        elif score >= 0.35:
             metrics.overall_level = SignalQualityLevel.FAIR
-        elif score >= 0.3:
+        elif score >= 0.15:
             metrics.overall_level = SignalQualityLevel.POOR
         else:
             metrics.overall_level = SignalQualityLevel.REJECTED

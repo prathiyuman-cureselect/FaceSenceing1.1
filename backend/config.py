@@ -68,11 +68,11 @@ class FFTConfig:
 @dataclass
 class QualityConfig:
     """Signal Quality Index thresholds."""
-    sqi_snr_threshold: float = 3.0       # Minimum SNR in dB
-    sqi_spectral_purity: float = 0.4     # Spectral concentration threshold
-    sqi_motion_threshold: float = 15.0   # Max mean optical flow magnitude
-    sqi_face_confidence: float = 0.6     # Min face detection confidence
-    rejection_window: int = 5            # Consecutive bad readings for rejection
+    sqi_snr_threshold: float = 1.0       # Relaxed from 3.0 for better initial tracking
+    sqi_spectral_purity: float = 0.2     # Relaxed from 0.4
+    sqi_motion_threshold: float = 20.0   # Slightly more tolerant to minor movement
+    sqi_face_confidence: float = 0.5     # Min face detection confidence
+    rejection_window: int = 15            # Give it more time to stabilize (30s) before rejection
     min_acceptable_hr: float = 40.0      # Minimum plausible HR
     max_acceptable_hr: float = 200.0     # Maximum plausible HR
     min_acceptable_rr: float = 6.0       # Minimum plausible RR
