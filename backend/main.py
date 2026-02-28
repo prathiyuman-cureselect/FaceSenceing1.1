@@ -358,6 +358,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     "data": {
                         "timestamp": result.timestamp.isoformat(),
                         "face_detected": result.face_detected,
+                        "face_rect": list(result.face_rect) if result.face_rect else None,
                         "buffer_fill": round(result.buffer_fill, 1),
                         "fps_actual": result.fps_actual,
                         "message": result.message,
@@ -374,6 +375,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             "lf_hf_ratio": result.vitals.lf_hf_ratio,
                             "perfusion_index": result.vitals.perfusion_index,
                             "skin_temp": result.vitals.skin_temp,
+                            "sympathetic_activity": result.vitals.sympathetic_activity,
+                            "parasympathetic_activity": result.vitals.parasympathetic_activity,
+                            "prq": result.vitals.prq,
+                            "wellness_score": result.vitals.wellness_score,
                         },
                         "quality": {
                             "snr_db": result.quality.snr_db,

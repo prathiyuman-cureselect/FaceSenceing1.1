@@ -36,6 +36,10 @@ class VitalSigns(BaseModel):
     lf_hf_ratio: Optional[float] = Field(None, description="Sympathetic/Parasympathetic balance")
     perfusion_index: Optional[float] = Field(None, description="Perfusion Index (AC/DC ratio)")
     skin_temp: Optional[float] = Field(None, description="Estimated Skin Temp (Celsius)")
+    sympathetic_activity: Optional[float] = Field(None, description="Sympathetic nervous system activity (0-100)")
+    parasympathetic_activity: Optional[float] = Field(None, description="Parasympathetic nervous system activity (0-100)")
+    prq: Optional[float] = Field(None, description="Parasympathetic Recovery Quotient")
+    wellness_score: Optional[float] = Field(None, description="Overall wellness score (0-10)")
 
 
 class SignalQualityMetrics(BaseModel):
@@ -59,6 +63,7 @@ class MeasurementResult(BaseModel):
     buffer_fill: float = Field(0.0, description="Buffer fill percentage (0-100)")
     fps_actual: float = Field(0.0, description="Actual processing FPS")
     face_detected: bool = False
+    face_rect: Optional[List[int]] = Field(None, description="Face bounding box [x, y, w, h]")
     message: str = ""
 
 

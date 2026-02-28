@@ -34,7 +34,7 @@
                 <span class="feature-chip">Stress Index</span>
             </div>
 
-          
+
 
             <button class="btn btn-primary btn-start-custom" id="btnStart">
                 Start Camera & Begin Analysis
@@ -82,6 +82,8 @@
             </div>
             <div class="video-wrapper" id="videoWrapper">
                 <video id="videoFeed" autoplay playsinline muted></video>
+                <canvas id="blurCanvas"
+                    style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></canvas>
                 <canvas id="canvasHidden"></canvas>
                 <div class="video-overlay">
                 </div>
@@ -193,6 +195,34 @@
                         <div class="hrv-metric-value" id="piValue">--</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Sympathetic Activity -->
+            <div class="vital-card hr" id="cardSympathetic" style="border-top: 3px solid #f87171;">
+                <span class="vital-label"><span class="icon">⚡</span> Sympathetic Stress</span>
+                <div class="vital-value inactive" id="sympatheticValue" style="color: #f87171;">--</div>
+                <span class="vital-unit">% Activity</span>
+            </div>
+
+            <!-- Parasympathetic Activity -->
+            <div class="vital-card rr" id="cardParasympathetic" style="border-top: 3px solid #60a5fa;">
+                <span class="vital-label"><span class="icon">🧘</span> Parasympathetic</span>
+                <div class="vital-value inactive" id="parasympatheticValue" style="color: #60a5fa;">--</div>
+                <span class="vital-unit">% Activity</span>
+            </div>
+
+            <!-- PRQ -->
+            <div class="vital-card hrv" id="cardPRQ" style="border-top: 3px solid #a78bfa;">
+                <span class="vital-label"><span class="icon">🔄</span> PRQ</span>
+                <div class="vital-value inactive" id="prqValue" style="color: #a78bfa;">--</div>
+                <span class="vital-unit">Recovery Quotient</span>
+            </div>
+
+            <!-- Wellness Score -->
+            <div class="vital-card spo2" id="cardWellness" style="border-top: 3px solid #34d399;">
+                <span class="vital-label"><span class="icon">💚</span> Wellness Score</span>
+                <div class="vital-value inactive" id="wellnessValue" style="color: #34d399;">--</div>
+                <span class="vital-unit">/ 10</span>
             </div>
         </section>
 

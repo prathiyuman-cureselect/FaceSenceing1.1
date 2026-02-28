@@ -77,6 +77,9 @@ const state = {
     signalData: [],
     spectrumData: [],
     spectrumFreqs: [],
+
+    // Face rect for blur
+    faceRect: null,
 };
 
 // ─── DOM References ───────────────────────────────────────────────────
@@ -92,6 +95,7 @@ const DOM = {
 
     videoFeed: document.getElementById('videoFeed'),
     canvas: document.getElementById('canvasHidden'),
+    blurCanvas: document.getElementById('blurCanvas'),
     videoWrapper: document.getElementById('videoWrapper'),
     faceGuideText: document.querySelector('#faceGuide span'),
     recChip: document.getElementById('recChip'),
@@ -489,6 +493,14 @@ function handleMeasurement(data) {
     // Quality
     updateQuality(data.quality);
 
+    // Face rect for blur
+    if (data.face_rect) {
+        state.faceRect = data.face_rect;
+    } else {
+        state.faceRect = null;
+    }
+    renderBlurOverlay();
+
     // Charts
     if (data.raw_signal && data.raw_signal.length > 0) {
         state.signalData = data.raw_signal;
@@ -586,10 +598,40 @@ function updateVitals(vitals) {
         tempEl.classList.remove('inactive');
     }
     if (vitals.perfusion_index && piEl) piEl.textContent = vitals.perfusion_index.toFixed(1);
+
+    // Sympathetic Activity
+    const sympEl = document.getElementById('sympatheticValue');
+    if (vitals.sympathetic_activity !== null && vitals.sympathetic_activity !== undefined && sympEl) {
+        sympEl.textContent = vitals.sympathetic_activity.toFixed(0);
+        sympEl.classList.remove('inactive');
+    }
+
+    // Parasympathetic Activity
+    const parasympEl = document.getElementById('parasympatheticValue');
+    if (vitals.parasympathetic_activity !== null && vitals.parasympathetic_activity !== undefined && parasympEl) {
+        parasympEl.textContent = vitals.parasympathetic_activity.toFixed(0);
+        parasympEl.classList.remove('inactive');
+    }
+
+    // PRQ
+    const prqEl = document.getElementById('prqValue');
+    if (vitals.prq !== null && vitals.prq !== undefined && prqEl) {
+        prqEl.textContent = vitals.prq.toFixed(1);
+        prqEl.classList.remove('inactive');
+    }
+
+    // Wellness Score
+    const wellnessEl = document.getElementById('wellnessValue');
+    if (vitals.wellness_score !== null && vitals.wellness_score !== undefined && wellnessEl) {
+        wellnessEl.textContent = vitals.wellness_score.toFixed(1);
+        wellnessEl.classList.remove('inactive');
+        wellnessEl.style.color = vitals.wellness_score >= 7 ? '#34d399' :
+            (vitals.wellness_score >= 4 ? '#fbbf24' : '#ef4444');
+    }
 }
 
 function resetVitalsDisplay() {
-    const ids = ['hrValue', 'rrValue', 'hrvValue', 'spo2Value', 'bpValue', 'stressValue', 'sysValue', 'diaValue', 'lfhfValue', 'tempValue', 'piValue', 'sdnnValue', 'pnn50Value'];
+    const ids = ['hrValue', 'rrValue', 'hrvValue', 'spo2Value', 'bpValue', 'stressValue', 'sysValue', 'diaValue', 'lfhfValue', 'tempValue', 'piValue', 'sdnnValue', 'pnn50Value', 'sympatheticValue', 'parasympatheticValue', 'prqValue', 'wellnessValue'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -606,6 +648,83 @@ function updateHeartbeatSpeed(bpm) {
     document.querySelectorAll('.heartbeat-icon').forEach(el => {
         el.style.animationDuration = `${period}s`;
     });
+}
+
+// ─── Background Blur Overlay ─────────────────────────────────────────
+function renderBlurOverlay() {
+    const bc = DOM.blurCanvas;
+    const video = DOM.videoFeed;
+    if (!bc || !video || !video.videoWidth) return;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    bc.width = vw;
+    bc.height = vh;
+
+    const ctx = bc.getContext('2d');
+
+    if (!state.faceRect) {
+        // No face — clear overlay
+        ctx.clearRect(0, 0, vw, vh);
+        return;
+    }
+
+    // Draw the full video frame blurred
+    ctx.save();
+    ctx.filter = 'blur(12px)';
+    // Mirror horizontally to match the CSS scaleX(-1) on the video
+    ctx.translate(vw, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, vw, vh);
+    ctx.restore();
+
+    // Cut out the face region (show it clear/focused)
+    let [fx, fy, fw, fh] = state.faceRect;
+    // Mirror face x coordinate
+    fx = vw - fx - fw;
+    // Add small padding around the face
+    const pad = Math.round(fw * 0.15);
+    const cx = Math.max(0, fx - pad);
+    const cy = Math.max(0, fy - pad);
+    const cw = Math.min(vw - cx, fw + pad * 2);
+    const ch = Math.min(vh - cy, fh + pad * 2);
+
+    // Clear the face area from the blurred layer (reveals the sharp video underneath)
+    ctx.save();
+    ctx.beginPath();
+    // Draw rounded rectangle for the face cutout
+    const radius = Math.min(cw, ch) * 0.3;
+    ctx.moveTo(cx + radius, cy);
+    ctx.lineTo(cx + cw - radius, cy);
+    ctx.quadraticCurveTo(cx + cw, cy, cx + cw, cy + radius);
+    ctx.lineTo(cx + cw, cy + ch - radius);
+    ctx.quadraticCurveTo(cx + cw, cy + ch, cx + cw - radius, cy + ch);
+    ctx.lineTo(cx + radius, cy + ch);
+    ctx.quadraticCurveTo(cx, cy + ch, cx, cy + ch - radius);
+    ctx.lineTo(cx, cy + radius);
+    ctx.quadraticCurveTo(cx, cy, cx + radius, cy);
+    ctx.closePath();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fill();
+    ctx.restore();
+
+    // Draw a subtle green border around the face cutout
+    ctx.save();
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + radius, cy);
+    ctx.lineTo(cx + cw - radius, cy);
+    ctx.quadraticCurveTo(cx + cw, cy, cx + cw, cy + radius);
+    ctx.lineTo(cx + cw, cy + ch - radius);
+    ctx.quadraticCurveTo(cx + cw, cy + ch, cx + cw - radius, cy + ch);
+    ctx.lineTo(cx + radius, cy + ch);
+    ctx.quadraticCurveTo(cx, cy + ch, cx, cy + ch - radius);
+    ctx.lineTo(cx, cy + radius);
+    ctx.quadraticCurveTo(cx, cy, cx + radius, cy);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
 }
 
 // ─── Signal Quality Display ──────────────────────────────────────────

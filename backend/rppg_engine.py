@@ -87,6 +87,7 @@ class RPPGEngine:
         # Step 1: Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
         result.face_detected = face_rect is not None
+        result.face_rect = face_rect  # Store for frontend blur
 
         if not result.face_detected:
             result.message = "No face detected. Please position your face in the frame."
@@ -183,6 +184,40 @@ class RPPGEngine:
             rgb_array[:, 0],  # Red channel
             rgb_array[:, 2],  # Blue channel
         )
+
+        # 6. Sympathetic & Parasympathetic Activity (from LF/HF ratio)
+        if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
+            total = vitals.lf_hf_ratio + 1.0
+            vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
+            vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
+        elif vitals.stress_index is not None:
+            # Fallback: derive from stress index
+            stress_pct = min(100, (vitals.stress_index / 10.0))
+            vitals.sympathetic_activity = round(stress_pct, 1)
+            vitals.parasympathetic_activity = round(100 - stress_pct, 1)
+
+        # 7. PRQ (Parasympathetic Recovery Quotient)
+        if vitals.parasympathetic_activity is not None and vitals.heart_rate:
+            # PRQ = parasympathetic strength relative to cardiac demand
+            vitals.prq = round((vitals.parasympathetic_activity / max(vitals.heart_rate, 1)) * 10, 2)
+
+        # 8. Wellness Score (composite 0-10)
+        ws_components = []
+        if vitals.heart_rate:
+            # HR score: 60-80 is ideal
+            hr_score = max(0, 10 - abs(vitals.heart_rate - 70) * 0.2)
+            ws_components.append(hr_score)
+        if vitals.spo2_estimate:
+            spo2_score = max(0, (vitals.spo2_estimate - 90) * 1.0)
+            ws_components.append(spo2_score)
+        if vitals.stress_index is not None:
+            stress_score = max(0, 10 - vitals.stress_index / 100)
+            ws_components.append(stress_score)
+        if vitals.hrv_rmssd is not None:
+            hrv_score = min(10, vitals.hrv_rmssd / 5)
+            ws_components.append(hrv_score)
+        if ws_components:
+            vitals.wellness_score = round(sum(ws_components) / len(ws_components), 1)
 
         # Step 9: Signal Quality
         quality = self.signal_processor.compute_sqi(
