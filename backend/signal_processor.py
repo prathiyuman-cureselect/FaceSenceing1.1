@@ -295,26 +295,104 @@ class SignalProcessor:
 
         return metrics
 
-    def estimate_bp(self, hr: float, pulse_amplitude: float) -> Tuple[float, float]:
+    def estimate_bp(
+        self,
+        hr: float,
+        pulse_amplitude: float,
+        hr_filtered: np.ndarray = None,
+        rgb_array: np.ndarray = None,
+    ) -> Tuple[float, float]:
         """
-        Estimate Blood Pressure using Pulse Wave Analysis logic calibrator.
-        Anchors to user-calibrated baseline (or healthy norm default)
-        and scales based on HR variance and pulse amplitude.
-        """
-        # Baseline BP
-        base_sys = self.calib_data.get('baseline_sys', 118.0)
-        base_dia = self.calib_data.get('baseline_dia', 78.0)
+        Multi-factor Blood Pressure estimation using Pulse Wave Analysis.
 
-        # SBP = base + (HR variance) + (Pulse Modulator) - dampen multipliers for realistic numbers
-        sbp = base_sys + ((hr - 72.0) * 0.1) + (pulse_amplitude * 0.5)
-        
-        # DBP = base + (HR variance) - (Pulse Modulator)
-        dbp = base_dia + ((hr - 72.0) * 0.05) - (pulse_amplitude * 0.2)
-        
-        # Clamp to realistic physiological ranges near baseline
-        sbp = max(base_sys - 20, min(base_sys + 25, sbp))
-        dbp = max(base_dia - 15, min(base_dia + 20, dbp))
-        
+        Uses 5 physiological correlates detectable from camera rPPG:
+        1. Heart Rate deviation — elevated HR correlates with higher BP
+        2. Pulse Amplitude (AC) — stronger pulsations indicate higher pressure
+        3. Pulse Wave Variability — beat-to-beat variation in amplitude
+        4. Signal energy — total power in the pulse waveform
+        5. Red channel intensity — facial flushing / vasoconstriction proxy
+        """
+        # Baseline BP (from calibration or healthy default)
+        base_sys = self.calib_data.get('baseline_sys', 120.0)
+        base_dia = self.calib_data.get('baseline_dia', 80.0)
+
+        # ── Factor 1: Heart Rate deviation ──
+        # Resting HR ~72 BPM. Higher HR → sympathetic activation → higher BP
+        hr_dev = hr - 72.0
+        hr_sys_contrib = hr_dev * 0.3
+        hr_dia_contrib = hr_dev * 0.15
+
+        # ── Factor 2: Pulse Amplitude (AC component) ──
+        # Larger AC amplitude → stronger pulse wave → higher pulse pressure
+        amp_sys_contrib = pulse_amplitude * 2.5
+        amp_dia_contrib = pulse_amplitude * 1.0
+
+        # ── Factor 3: Pulse Wave Variability (beat-to-beat) ──
+        pwv_contrib_sys = 0.0
+        pwv_contrib_dia = 0.0
+        if hr_filtered is not None and len(hr_filtered) > 60:
+            # Find peaks in the filtered signal
+            peaks = []
+            for i in range(1, len(hr_filtered) - 1):
+                if hr_filtered[i] > hr_filtered[i-1] and hr_filtered[i] > hr_filtered[i+1]:
+                    if hr_filtered[i] > 0.3 * np.max(hr_filtered):
+                        peaks.append(hr_filtered[i])
+            if len(peaks) > 3:
+                # Higher peak-to-peak variability → arterial stiffness → higher BP
+                peak_std = np.std(peaks)
+                peak_mean = np.mean(peaks)
+                if peak_mean > 0:
+                    variability = peak_std / peak_mean
+                    pwv_contrib_sys = variability * 15.0
+                    pwv_contrib_dia = variability * 8.0
+
+        # ── Factor 4: Signal Energy ──
+        energy_contrib_sys = 0.0
+        energy_contrib_dia = 0.0
+        if hr_filtered is not None and len(hr_filtered) > 30:
+            signal_energy = np.sum(hr_filtered ** 2) / len(hr_filtered)
+            # Higher energy → more forceful cardiac output
+            energy_contrib_sys = min(signal_energy * 5.0, 15.0)
+            energy_contrib_dia = min(signal_energy * 2.5, 8.0)
+
+        # ── Factor 5: Red Channel Intensity (vasodilation proxy) ──
+        red_contrib_sys = 0.0
+        red_contrib_dia = 0.0
+        if rgb_array is not None and len(rgb_array) > 10:
+            red_mean = np.mean(rgb_array[:, 0])
+            green_mean = np.mean(rgb_array[:, 1])
+            if green_mean > 0:
+                rg_ratio = red_mean / green_mean
+                # Higher R/G ratio → more facial flushing → correlates with higher BP
+                red_contrib_sys = max(0, (rg_ratio - 1.0) * 8.0)
+                red_contrib_dia = max(0, (rg_ratio - 1.0) * 4.0)
+
+        # ── Combine all factors ──
+        sbp = (
+            base_sys
+            + hr_sys_contrib
+            + amp_sys_contrib
+            + pwv_contrib_sys
+            + energy_contrib_sys
+            + red_contrib_sys
+        )
+        dbp = (
+            base_dia
+            + hr_dia_contrib
+            + amp_dia_contrib
+            + pwv_contrib_dia
+            + energy_contrib_dia
+            + red_contrib_dia
+        )
+
+        # Ensure pulse pressure (SBP - DBP) stays physiologically valid (>= 25)
+        if sbp - dbp < 25:
+            dbp = sbp - 25
+
+        # Wide physiological clamp (allows hypertensive readings)
+        sbp = max(90.0, min(200.0, sbp))
+        dbp = max(55.0, min(120.0, dbp))
+
         return round(sbp, 1), round(dbp, 1)
 
     def compute_perfusion_index(self, sig: np.ndarray, raw_rgb: np.ndarray) -> float:

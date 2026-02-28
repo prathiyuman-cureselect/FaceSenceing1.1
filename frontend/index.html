@@ -34,47 +34,7 @@
                 <span class="feature-chip">Stress Index</span>
             </div>
 
-            <div class="user-calibration"
-                style="margin: 20px 0; padding: 15px; border: 1px solid #334155; border-radius: 8px; background: rgba(15, 23, 42, 0.5);">
-                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1rem; color: #94a3b8;">Patient Baseline
-                    Calibration (Required for BP/SpO2 Accuracy)</h3>
-                <div
-                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; font-size: 0.85rem;">
-                    <label style="color: #cbd5e1;">Baseline SYS BP (mmHg)
-                        <input type="number" id="calibSys" placeholder="Default 118"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: white;">
-                    </label>
-                    <label style="color: #cbd5e1;">Baseline DIA BP (mmHg)
-                        <input type="number" id="calibDia" placeholder="Default 78"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: white;">
-                    </label>
-                    <label style="color: #cbd5e1;">Baseline Temp (°F)
-                        <input type="number" id="calibTemp" placeholder="Default 97.6" step="0.1"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: white;">
-                    </label>
-                    <label style="color: #cbd5e1;">Baseline SpO2 (%)
-                        <input type="number" id="calibSpo2" placeholder="Default 98"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: white;">
-                    </label>
-                </div>
-            </div>
-
-            <div class="accuracy-guidelines"
-                style="margin: 20px 0; padding: 15px; border: 1px solid #10b981; border-radius: 8px; background: rgba(16, 185, 129, 0.05); text-align: left; font-size: 0.85rem; color: #d1fae5;">
-                <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1rem; color: #34d399;">📋 Guidelines for
-                    Highest Accuracy</h3>
-                <ul style="margin: 0; padding-left: 20px; line-height: 1.6;">
-                    <li><b>Lighting:</b> Ensure your face is evenly lit. Avoid shadows or bright backlighting.</li>
-                    <li><b>Movement:</b> Keep your head <u>completely</u> still. Talking or shifting distorts the pulse
-                        signal.</li>
-                    <li><b>Distance:</b> Sit at a normal conversational distance (about arm's length) from the camera.
-                    </li>
-                    <li><b>Appearance:</b> Heavy makeup, thick glasses, or hair covering the forehead can interfere with
-                        the reading.</li>
-                    <li><b>Important:</b> This is an AI estimation based on facial blood flow. Do not use for clinical
-                        diagnosis.</li>
-                </ul>
-            </div>
+          
 
             <button class="btn btn-primary btn-start-custom" id="btnStart">
                 Start Camera & Begin Analysis

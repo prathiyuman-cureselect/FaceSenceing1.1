@@ -157,11 +157,16 @@ class RPPGEngine:
         vitals.stress_index = hrv_metrics["stress_index"]
         vitals.lf_hf_ratio = hrv_metrics["lf_hf_ratio"]
 
-        # 2. Blood Pressure (Estimated)
+        # 2. Blood Pressure (Multi-factor Estimated)
         if vitals.heart_rate:
             # use signal amplitude as proxy for pulse pressure
             amp = np.std(hr_filtered)
-            sys, dia = self.signal_processor.estimate_bp(vitals.heart_rate, amp)
+            sys, dia = self.signal_processor.estimate_bp(
+                vitals.heart_rate,
+                amp,
+                hr_filtered=hr_filtered,
+                rgb_array=rgb_array,
+            )
             vitals.blood_pressure_sys = sys
             vitals.blood_pressure_dia = dia
 
