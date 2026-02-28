@@ -38,8 +38,8 @@ class ROIConfig:
 class SignalConfig:
     """Signal processing parameters."""
     buffer_size: int = 150       # ~7.5 seconds at 20fps
-    min_buffer_size: int = 40    # ~2 seconds minimum to start showing results
-    pos_window: int = 30         # Temporal window >= 1 heartbeat for stable processing
+    min_buffer_size: int = 20    # ~1 second minimum to start showing results instantly
+    pos_window: int = 15         # Temporal window >= 0.5 heartbeat for stable processing
     detrend_lambda: float = 300  # Detrending smoothness parameter
 
 

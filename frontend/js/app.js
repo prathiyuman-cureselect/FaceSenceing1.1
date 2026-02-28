@@ -24,8 +24,8 @@ const PORT = (HOSTNAME === 'localhost' || HOSTNAME.includes('192.168.')) ? ':800
 
 const CONFIG = {
     WS_URL: `${PROTOCOL}//${HOSTNAME}${PORT}/ws`,
-    FRAME_INTERVAL_MS: 50,       // 20 fps capture rate for higher pulse resolution
-    JPEG_QUALITY: 0.6,             // Slightly lower quality to compensate for higher rate
+    FRAME_INTERVAL_MS: 100,       // 10 fps capture rate to massively reduce JS thread blocking on low-end devices
+    JPEG_QUALITY: 0.5,             // Reduced quality so the frame is sent instantaneously
     MAX_RECONNECT_ATTEMPTS: 10,
     RECONNECT_DELAY_MS: 2000,
     SPARKLINE_MAX_POINTS: 60,
@@ -390,7 +390,7 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 30; // Max fallback time 30s
+    state.timeLeft = 12; // Max fallback time EXACTLY 12 seconds
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
@@ -420,7 +420,7 @@ function startFrameCapture() {
             clearInterval(state.fastUIInterval);
             state.fastUIInterval = null;
         }
-    }, 350); // cycles exactly through all parts in ~2 seconds before vitals usually lock
+    }, 250); // fast 250ms interval to get through all parts in 1.5 seconds minimum
 
     state.scanTimerInterval = setInterval(() => {
         state.timeLeft--;
@@ -433,7 +433,7 @@ function startFrameCapture() {
         } else {
             // If in vitals phase, show progress. Otherwise show seconds.
             if (state.scanPhase === 'vitals') {
-                const progress = Math.min(100, (state.allHR.length / 15) * 100).toFixed(0);
+                const progress = Math.min(100, (state.allHR.length / 6) * 100).toFixed(0);
                 if (DOM.timerText) DOM.timerText.textContent = `💓 Fetching Vitals... ${progress}%`;
                 if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
             } else {
@@ -689,8 +689,8 @@ function handleMeasurement(data) {
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
 
-        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (just 15 frames)
-        if (state.allHR.length >= 15 && state.isRunning) {
+        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (just 6 frames = fraction of a second)
+        if (state.allHR.length >= 6 && state.isRunning) {
             if (DOM.timerText) DOM.timerText.textContent = `✅ Status: DONE!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
