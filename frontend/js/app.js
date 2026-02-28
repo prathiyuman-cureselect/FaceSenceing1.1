@@ -402,6 +402,26 @@ function startFrameCapture() {
     updateMessage('Step 1: Detecting face and selecting Region of Interest (ROI)', 'info');
     state.scanPhase = 'face';
 
+    let facePartIdx = 0;
+    const faceParts = [
+        '👁️ Checking Eye...',
+        '👃 Checking Nose...',
+        '👤 Checking Head...',
+        '🧠 Checking Forehead...',
+        '👄 Checking Mouth...',
+        '👤 Scanning Full Face...'
+    ];
+
+    state.fastUIInterval = setInterval(() => {
+        if (state.scanPhase === 'face') {
+            if (DOM.timerText) DOM.timerText.textContent = faceParts[Math.min(facePartIdx, faceParts.length - 1)];
+            facePartIdx++;
+        } else {
+            clearInterval(state.fastUIInterval);
+            state.fastUIInterval = null;
+        }
+    }, 350); // cycles exactly through all parts in ~2 seconds before vitals usually lock
+
     state.scanTimerInterval = setInterval(() => {
         state.timeLeft--;
 
@@ -431,6 +451,10 @@ function stopFrameCapture() {
     if (state.scanTimerInterval) {
         clearInterval(state.scanTimerInterval);
         state.scanTimerInterval = null;
+    }
+    if (state.fastUIInterval) {
+        clearInterval(state.fastUIInterval);
+        state.fastUIInterval = null;
     }
     DOM.recChip.style.display = 'none';
     if (DOM.timerChip) DOM.timerChip.style.display = 'none';
