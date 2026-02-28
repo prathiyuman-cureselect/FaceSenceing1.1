@@ -344,15 +344,16 @@ class FaceDetector:
             gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
             # Score: positive = male tendency, negative = female tendency
-            # Base bias towards Male to counteract the skin-smoothing bias
-            score = 1.0
+            # Significant base bias towards Male to counteract the aggressive skin-smoothing blur
+            # which otherwise universally penalizes men for having "female-like" smooth skin data
+            score = 2.5
 
             # 1. Face aspect ratio: Males tend to have wider faces relative to height
             aspect = w / max(h, 1)
-            if aspect > 0.82:
-                score += 1.5  # wider jaw = more masculine
-            elif aspect < 0.72:
-                score -= 1.5  # narrower/oval = more feminine
+            if aspect > 0.85:
+                score += 1.0  # wider jaw = more masculine
+            elif aspect < 0.65:
+                score -= 1.0  # narrower/oval = more feminine
 
             # 2. Jaw region intensity contrast (lower 1/3 of face)
             jaw_region = gray[2*h//3:, :]
@@ -361,33 +362,35 @@ class FaceDetector:
                 jaw_contrast = np.std(jaw_region.astype(float))
                 upper_contrast = np.std(upper_region.astype(float))
                 # Males often have more jaw texture (stubble, stronger jaw)
-                if jaw_contrast > upper_contrast * 1.15:
-                    score += 1.0
-                elif jaw_contrast < upper_contrast * 0.85:
-                    score -= 1.0
+                if jaw_contrast > upper_contrast * 1.25:
+                    score += 1.5
+                elif jaw_contrast < upper_contrast * 0.80:
+                    score -= 0.5  # Softened feminine penalty
 
             # 3. Eyebrow region thickness/darkness
             brow_region = gray[h//6:h//4, w//6:5*w//6]
             if brow_region.size > 0:
                 brow_darkness = 255 - np.mean(brow_region)
-                if brow_darkness > 100:
+                if brow_darkness > 90:
                     score += 1.5  # Darker/thicker brows = masculine
-                elif brow_darkness < 60:
+                elif brow_darkness < 50:
                     score -= 1.0  # Lighter brows = feminine
 
-            # 4. Skin smoothness (females typically have smoother skin)
+            # 4. Skin smoothness
+            # Because we applied GaussianBlur to kill webcam noise, ALL skin is very smooth now. 
+            # We must drastically reduce the penalty for smooth skin, otherwise men are classified as women.
             center = gray[h//4:3*h//4, w//4:3*w//4]
             if center.size > 0:
                 smoothness = cv2.Laplacian(center, cv2.CV_64F).var()
-                if smoothness < 200:
-                    score -= 1.5  # Smoother = feminine
-                elif smoothness > 500:
-                    score += 1.0  # More texture = masculine
+                if smoothness < 100:
+                    score -= 0.5  # Only slightly feminine if phenomenally smooth
+                elif smoothness > 400:
+                    score += 1.5  # Definite masculine stubble/texture
 
             # 5. Color features: LAB space
             lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
             a_mean = np.mean(lab[:, :, 1])  # redness channel
-            if a_mean > 135:
+            if a_mean > 138:
                 score -= 0.5  # More reddish/pink undertone = feminine tendency
 
             # 6. Nose width relative to face
@@ -395,8 +398,9 @@ class FaceDetector:
             if nose_region.size > 0:
                 nose_edges = cv2.Canny(nose_region, 50, 150)
                 edge_density = np.count_nonzero(nose_edges) / max(nose_region.size, 1)
-                if edge_density > 0.08:
-                    score += 0.5  # More prominent nose features = masculine
+                if edge_density > 0.07:
+                    score += 1.0  # More prominent nose features = masculine
+
 
             return "Male" if score > 0 else "Female"
 
