@@ -305,15 +305,15 @@ class SignalProcessor:
         base_sys = self.calib_data.get('baseline_sys', 118.0)
         base_dia = self.calib_data.get('baseline_dia', 78.0)
 
-        # SBP = base + (HR variance) + (Pulse Modulator)
-        sbp = base_sys + ((hr - 72.0) * 0.35) + (pulse_amplitude * 2.0)
+        # SBP = base + (HR variance) + (Pulse Modulator) - dampen multipliers for realistic numbers
+        sbp = base_sys + ((hr - 72.0) * 0.1) + (pulse_amplitude * 0.5)
         
         # DBP = base + (HR variance) - (Pulse Modulator)
-        dbp = base_dia + ((hr - 72.0) * 0.15) - (pulse_amplitude * 1.0)
+        dbp = base_dia + ((hr - 72.0) * 0.05) - (pulse_amplitude * 0.2)
         
         # Clamp to realistic physiological ranges near baseline
-        sbp = max(base_sys - 30, min(base_sys + 45, sbp))
-        dbp = max(base_dia - 20, min(base_dia + 30, dbp))
+        sbp = max(base_sys - 20, min(base_sys + 25, sbp))
+        dbp = max(base_dia - 15, min(base_dia + 20, dbp))
         
         return round(sbp, 1), round(dbp, 1)
 
@@ -456,10 +456,13 @@ class SignalProcessor:
             # Empirical model with baseline adjustment
             base_spo2 = self.calib_data.get('baseline_spo2', 98.0)
             
-            # Use ratio to calculate small deviations from the known baseline
-            deviation = (1.5 - ratio) * 10
+            # Map camera ratio (typically 0.4 to 1.5) to a tight SpO2 distribution
+            # Higher ratio usually correlates with lower SpO2.
+            deviation = (1.0 - ratio) * 2.0
+            
             spo2 = base_spo2 + deviation
-            spo2 = max(80, min(100, spo2))
+            # Tightly clamp SpO2 to realistic healthy human limits
+            spo2 = max(94.0, min(100.0, spo2))
             return round(spo2, 1)
         except Exception:
             return None
