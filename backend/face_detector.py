@@ -328,6 +328,80 @@ class FaceDetector:
             logger.warning(f"Age estimation failed: {e}")
             return None
 
+    def estimate_gender(self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]) -> Optional[str]:
+        """
+        Estimate gender from facial geometry and texture features.
+        Uses jaw width, eyebrow thickness, skin smoothness, and face proportions.
+        Returns 'Male' or 'Female'.
+        """
+        try:
+            x, y, w, h = face_rect
+            face_roi = frame[y:y+h, x:x+w]
+            if face_roi.size == 0 or w < 40 or h < 40:
+                return None
+
+            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+
+            # Score: positive = male tendency, negative = female tendency
+            score = 0.0
+
+            # 1. Face aspect ratio: Males tend to have wider faces relative to height
+            aspect = w / max(h, 1)
+            if aspect > 0.82:
+                score += 1.5  # wider jaw = more masculine
+            elif aspect < 0.72:
+                score -= 1.5  # narrower/oval = more feminine
+
+            # 2. Jaw region intensity contrast (lower 1/3 of face)
+            jaw_region = gray[2*h//3:, :]
+            upper_region = gray[:h//3, :]
+            if jaw_region.size > 0 and upper_region.size > 0:
+                jaw_contrast = np.std(jaw_region.astype(float))
+                upper_contrast = np.std(upper_region.astype(float))
+                # Males often have more jaw texture (stubble, stronger jaw)
+                if jaw_contrast > upper_contrast * 1.15:
+                    score += 1.0
+                elif jaw_contrast < upper_contrast * 0.85:
+                    score -= 1.0
+
+            # 3. Eyebrow region thickness/darkness
+            brow_region = gray[h//6:h//4, w//6:5*w//6]
+            if brow_region.size > 0:
+                brow_darkness = 255 - np.mean(brow_region)
+                if brow_darkness > 100:
+                    score += 1.5  # Darker/thicker brows = masculine
+                elif brow_darkness < 60:
+                    score -= 1.0  # Lighter brows = feminine
+
+            # 4. Skin smoothness (females typically have smoother skin)
+            center = gray[h//4:3*h//4, w//4:3*w//4]
+            if center.size > 0:
+                smoothness = cv2.Laplacian(center, cv2.CV_64F).var()
+                if smoothness < 200:
+                    score -= 1.5  # Smoother = feminine
+                elif smoothness > 500:
+                    score += 1.0  # More texture = masculine
+
+            # 5. Color features: LAB space
+            lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
+            a_mean = np.mean(lab[:, :, 1])  # redness channel
+            if a_mean > 135:
+                score -= 0.5  # More reddish/pink undertone = feminine tendency
+
+            # 6. Nose width relative to face
+            nose_region = gray[h//3:2*h//3, w//3:2*w//3]
+            if nose_region.size > 0:
+                nose_edges = cv2.Canny(nose_region, 50, 150)
+                edge_density = np.count_nonzero(nose_edges) / max(nose_region.size, 1)
+                if edge_density > 0.08:
+                    score += 0.5  # More prominent nose features = masculine
+
+            return "Male" if score > 0 else "Female"
+
+        except Exception as e:
+            logger.warning(f"Gender estimation failed: {e}")
+            return None
+
     def reset(self):
         """Reset tracker state."""
         self._prev_face_rect = None

@@ -94,12 +94,16 @@ class RPPGEngine:
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
             return result
 
-        # Step 1b: Age estimation (every 15 frames to avoid overhead)
+        # Step 1b: Age & Gender estimation (every 15 frames to avoid overhead)
         if self._frames_processed % 15 == 1:
             estimated_age = self.face_detector.estimate_age(frame, face_rect)
             if estimated_age is not None:
                 self._last_age = estimated_age
+            estimated_gender = self.face_detector.estimate_gender(frame, face_rect)
+            if estimated_gender is not None:
+                self._last_gender = estimated_gender
         result.estimated_age = getattr(self, '_last_age', None)
+        result.estimated_gender = getattr(self, '_last_gender', None)
 
         # Dynamic FPS Adaptation: Update signal processor with real-world timing
         if result.fps_actual > 5.0 and abs(self.signal_processor.fps - result.fps_actual) > 2.0:

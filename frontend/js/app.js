@@ -96,6 +96,8 @@ const state = {
     allPRQ: [],
     allWellness: [],
     allAge: [],
+    allGender: [],
+    scanPhase: 'face', // 'face' or 'vitals'
     goodMeasurements: 0,
     totalMeasurements: 0,
 };
@@ -392,21 +394,31 @@ function startFrameCapture() {
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
-    ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness', 'allAge'].forEach(k => state[k] = []);
+    ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness', 'allAge', 'allGender'].forEach(k => state[k] = []);
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
-    if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
-    if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
+    if (DOM.timerChip) DOM.timerChip.style.background = '#7c3aed'; // Purple for face scan phase
+    if (DOM.timerText) DOM.timerText.textContent = `👤 Scanning Face...`;
+    state.scanPhase = 'face';
+    updateMessage('📸 Phase 1: Scanning your face for age & gender...', 'info');
 
     state.scanTimerInterval = setInterval(() => {
         state.timeLeft--;
+
         if (state.timeLeft <= 0) {
             clearInterval(state.scanTimerInterval);
-            if (DOM.timerText) DOM.timerText.textContent = `⏱️ Done!`;
+            if (DOM.timerText) DOM.timerText.textContent = `✅ Done!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
-            // Auto-stop and show results
             autoCompleteSession();
+        } else if (state.timeLeft <= 30 && state.scanPhase === 'face') {
+            // Switch to vitals phase after 5 seconds
+            state.scanPhase = 'vitals';
+            if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
+            if (DOM.timerText) DOM.timerText.textContent = `💓 ${state.timeLeft}s · Sensing Vitals...`;
+            updateMessage('💓 Phase 2: Sensing your vital signs — hold still!', 'info');
+        } else if (state.scanPhase === 'vitals') {
+            if (DOM.timerText) DOM.timerText.textContent = `💓 ${state.timeLeft}s · Sensing Vitals...`;
         } else {
-            if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
+            if (DOM.timerText) DOM.timerText.textContent = `👤 Scanning Face... ${state.timeLeft}s`;
         }
     }, 1000);
 }
@@ -533,13 +545,30 @@ function showResultsScreen() {
     const confidenceLabel = confidence >= 70 ? 'HIGH' : (confidence >= 40 ? 'MEDIUM' : 'LOW');
     const estimatedAge = median(state.allAge);
 
+    // Gender: use mode (most frequent value)
+    const genderCounts = {};
+    state.allGender.forEach(g => { genderCounts[g] = (genderCounts[g] || 0) + 1; });
+    const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || null;
+    const genderIcon = estimatedGender === 'Male' ? '♂️' : estimatedGender === 'Female' ? '♀️' : '❓';
+    const genderColor = estimatedGender === 'Male' ? '#3b82f6' : '#ec4899';
+
     DOM.resultsGrid.innerHTML = `
         <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid #8b5cf6; background: linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05));">
-            <div class="result-icon" style="font-size: 2.5rem;">👤</div>
-            <div class="result-label">Estimated Age</div>
-            <div class="result-value" style="color: #8b5cf6; font-size: 2.5rem;">~${estimatedAge ? estimatedAge : '--'}</div>
-            <div class="result-unit">years old</div>
-            <div class="result-samples">${state.allAge.length} face samples analyzed</div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 32px; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <div class="result-icon" style="font-size: 2.2rem;">👤</div>
+                    <div class="result-label">Estimated Age</div>
+                    <div class="result-value" style="color: #8b5cf6; font-size: 2.2rem;">~${estimatedAge ? estimatedAge : '--'}</div>
+                    <div class="result-unit">years old</div>
+                </div>
+                <div style="width: 1px; height: 60px; background: rgba(0,0,0,0.1);"></div>
+                <div style="text-align: center;">
+                    <div class="result-icon" style="font-size: 2.2rem;">${genderIcon}</div>
+                    <div class="result-label">Gender</div>
+                    <div class="result-value" style="color: ${genderColor}; font-size: 2.2rem;">${estimatedGender || '--'}</div>
+                    <div class="result-unit">${state.allGender.length} face samples</div>
+                </div>
+            </div>
         </div>
         <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid ${confidenceColor};">
             <div class="result-icon">🎯</div>
@@ -608,8 +637,8 @@ function handleMeasurement(data) {
     // Vitals
     updateVitals(data.vitals);
 
-    // Accumulate ALL vitals for median computation at end
-    if (data.vitals && data.quality && data.quality.acceptable) {
+    // Accumulate ALL vitals for median computation at end (only during the 'vitals' phase)
+    if (state.scanPhase === 'vitals' && data.vitals && data.quality && data.quality.acceptable) {
         state.totalMeasurements++;
         state.goodMeasurements++;
         const v = data.vitals;
@@ -633,12 +662,15 @@ function handleMeasurement(data) {
         state.totalMeasurements++;
     }
 
-    // Age estimation — accumulate regardless of quality
+    // Age & Gender estimation — accumulate regardless of quality
     if (data.estimated_age) {
         state.allAge.push(data.estimated_age);
-        // Show age on video
-        showAgeOnVideo(data.estimated_age);
     }
+    if (data.estimated_gender) {
+        state.allGender.push(data.estimated_gender);
+    }
+    // Show face info on video
+    showFaceInfoOnVideo(data.estimated_age, data.estimated_gender);
 
     // Quality
     updateQuality(data.quality);
@@ -792,8 +824,8 @@ function updateHeartbeatSpeed(bpm) {
     });
 }
 
-// ─── Age Display on Video ────────────────────────────────────────────
-function showAgeOnVideo(age) {
+// ─── Face Info Display on Video ──────────────────────────────────────
+function showFaceInfoOnVideo(age, gender) {
     let badge = document.getElementById('ageBadge');
     if (!badge) {
         badge = document.createElement('div');
@@ -805,10 +837,17 @@ function showAgeOnVideo(age) {
             font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
             font-weight: 700; transition: all 0.3s ease;
             border: 1px solid rgba(255,255,255,0.15);
+            display: flex; flex-direction: column; gap: 2px;
         `;
         DOM.videoWrapper.appendChild(badge);
     }
-    badge.innerHTML = `👤 Age: ~${age} yrs`;
+    const genderIcon = gender === 'Male' ? '♂️' : gender === 'Female' ? '♀️' : '';
+    const ageText = age ? `~${age} yrs` : '...';
+    const genderText = gender || '...';
+    badge.innerHTML = `
+        <span style="font-size: 0.75rem; opacity: 0.7;">FACE SCAN</span>
+        <span>👤 ${ageText} · ${genderIcon} ${genderText}</span>
+    `;
 }
 
 

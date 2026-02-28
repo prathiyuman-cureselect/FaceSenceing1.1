@@ -65,6 +65,7 @@ class MeasurementResult(BaseModel):
     face_detected: bool = False
     face_rect: Optional[List[int]] = Field(None, description="Face bounding box [x, y, w, h]")
     estimated_age: Optional[int] = Field(None, description="Estimated age from facial analysis")
+    estimated_gender: Optional[str] = Field(None, description="Estimated gender from facial analysis")
     message: str = ""
 
 

@@ -360,6 +360,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                         "face_detected": result.face_detected,
                         "face_rect": list(result.face_rect) if result.face_rect else None,
                         "estimated_age": result.estimated_age,
+                        "estimated_gender": result.estimated_gender,
                         "buffer_fill": round(result.buffer_fill, 1),
                         "fps_actual": result.fps_actual,
                         "message": result.message,
