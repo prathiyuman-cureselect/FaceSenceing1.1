@@ -244,6 +244,90 @@ class FaceDetector:
         # Average across ROIs
         return np.mean(signals, axis=0)
 
+    def estimate_age(self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]) -> Optional[int]:
+        """
+        Estimate age from facial features using skin texture analysis.
+        Uses wrinkle detection, skin uniformity, and color distribution.
+        Returns estimated age as integer.
+        """
+        try:
+            x, y, w, h = face_rect
+            face_roi = frame[y:y+h, x:x+w]
+            if face_roi.size == 0 or w < 40 or h < 40:
+                return None
+
+            # Convert to grayscale for texture analysis
+            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+
+            # 1. Wrinkle/texture score — Laplacian variance (higher = more detail/wrinkles)
+            forehead_region = gray[0:h//4, w//4:3*w//4]
+            if forehead_region.size == 0:
+                return None
+            laplacian_var = cv2.Laplacian(forehead_region, cv2.CV_64F).var()
+
+            # 2. Skin smoothness — standard deviation of pixel intensities
+            skin_std = np.std(gray[h//4:3*h//4, w//4:3*w//4].astype(float))
+
+            # 3. Under-eye texture (wrinkles around eyes indicate aging)
+            eye_region = gray[h//4:h//2, :]
+            eye_texture = cv2.Laplacian(eye_region, cv2.CV_64F).var() if eye_region.size > 0 else 0
+
+            # 4. Skin color features in LAB space
+            lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
+            l_mean = np.mean(lab[:, :, 0])
+            a_mean = np.mean(lab[:, :, 1])  # skin redness
+            b_mean = np.mean(lab[:, :, 2])  # skin yellowness
+
+            # 5. Face aspect ratio (children have rounder faces)
+            aspect_ratio = w / max(h, 1)
+
+            # Estimate age from features
+            # Base age: start from 25
+            age = 25.0
+
+            # Wrinkle contribution (more wrinkles = older)
+            if laplacian_var > 800:
+                age += 20
+            elif laplacian_var > 400:
+                age += 12
+            elif laplacian_var > 200:
+                age += 5
+            elif laplacian_var < 50:
+                age -= 8  # Very smooth = younger
+
+            # Skin uniformity (less uniform = older)
+            if skin_std > 35:
+                age += 10
+            elif skin_std > 25:
+                age += 5
+            elif skin_std < 15:
+                age -= 5
+
+            # Eye texture
+            if eye_texture > 500:
+                age += 8
+            elif eye_texture > 200:
+                age += 3
+
+            # Skin color: older skin tends to be less vibrant
+            if l_mean < 120:
+                age += 3
+            if b_mean > 140:
+                age += 4  # more yellowish
+
+            # Face shape
+            if aspect_ratio > 0.85:
+                age -= 3  # rounder = younger
+
+            # Clamp to reasonable range
+            age = max(15, min(80, age))
+
+            return int(round(age))
+
+        except Exception as e:
+            logger.warning(f"Age estimation failed: {e}")
+            return None
+
     def reset(self):
         """Reset tracker state."""
         self._prev_face_rect = None

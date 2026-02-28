@@ -87,12 +87,19 @@ class RPPGEngine:
         # Step 1: Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
         result.face_detected = face_rect is not None
-        result.face_rect = face_rect  # Store for frontend blur
+        result.face_rect = face_rect  # Store for frontend
 
         if not result.face_detected:
             result.message = "No face detected. Please position your face in the frame."
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
             return result
+
+        # Step 1b: Age estimation (every 15 frames to avoid overhead)
+        if self._frames_processed % 15 == 1:
+            estimated_age = self.face_detector.estimate_age(frame, face_rect)
+            if estimated_age is not None:
+                self._last_age = estimated_age
+        result.estimated_age = getattr(self, '_last_age', None)
 
         # Dynamic FPS Adaptation: Update signal processor with real-world timing
         if result.fps_actual > 5.0 and abs(self.signal_processor.fps - result.fps_actual) > 2.0:

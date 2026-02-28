@@ -65,7 +65,7 @@ const state = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     scanTimerInterval: null,
-    timeLeft: 60,
+    timeLeft: 35,
 
     // Vital histories (for sparklines)
     hrHistory: [],
@@ -95,6 +95,7 @@ const state = {
     allParasympathetic: [],
     allPRQ: [],
     allWellness: [],
+    allAge: [],
     goodMeasurements: 0,
     totalMeasurements: 0,
 };
@@ -387,11 +388,11 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 60;
+    state.timeLeft = 35;
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
-    ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness'].forEach(k => state[k] = []);
+    ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness', 'allAge'].forEach(k => state[k] = []);
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
     if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
     if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
@@ -530,8 +531,16 @@ function showResultsScreen() {
 
     const confidenceColor = confidence >= 70 ? '#10b981' : (confidence >= 40 ? '#fbbf24' : '#ef4444');
     const confidenceLabel = confidence >= 70 ? 'HIGH' : (confidence >= 40 ? 'MEDIUM' : 'LOW');
+    const estimatedAge = median(state.allAge);
 
     DOM.resultsGrid.innerHTML = `
+        <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid #8b5cf6; background: linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05));">
+            <div class="result-icon" style="font-size: 2.5rem;">👤</div>
+            <div class="result-label">Estimated Age</div>
+            <div class="result-value" style="color: #8b5cf6; font-size: 2.5rem;">~${estimatedAge ? estimatedAge : '--'}</div>
+            <div class="result-unit">years old</div>
+            <div class="result-samples">${state.allAge.length} face samples analyzed</div>
+        </div>
         <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid ${confidenceColor};">
             <div class="result-icon">🎯</div>
             <div class="result-label">Measurement Confidence</div>
@@ -622,6 +631,13 @@ function handleMeasurement(data) {
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
     } else if (data.vitals) {
         state.totalMeasurements++;
+    }
+
+    // Age estimation — accumulate regardless of quality
+    if (data.estimated_age) {
+        state.allAge.push(data.estimated_age);
+        // Show age on video
+        showAgeOnVideo(data.estimated_age);
     }
 
     // Quality
@@ -774,6 +790,25 @@ function updateHeartbeatSpeed(bpm) {
     document.querySelectorAll('.heartbeat-icon').forEach(el => {
         el.style.animationDuration = `${period}s`;
     });
+}
+
+// ─── Age Display on Video ────────────────────────────────────────────
+function showAgeOnVideo(age) {
+    let badge = document.getElementById('ageBadge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'ageBadge';
+        badge.style.cssText = `
+            position: absolute; top: 12px; left: 12px; z-index: 20;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            color: white; padding: 8px 14px; border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+            font-weight: 700; transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.15);
+        `;
+        DOM.videoWrapper.appendChild(badge);
+    }
+    badge.innerHTML = `👤 Age: ~${age} yrs`;
 }
 
 

@@ -64,6 +64,7 @@ class MeasurementResult(BaseModel):
     fps_actual: float = Field(0.0, description="Actual processing FPS")
     face_detected: bool = False
     face_rect: Optional[List[int]] = Field(None, description="Face bounding box [x, y, w, h]")
+    estimated_age: Optional[int] = Field(None, description="Estimated age from facial analysis")
     message: str = ""
 
 
