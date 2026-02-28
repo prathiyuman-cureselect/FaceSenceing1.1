@@ -97,6 +97,16 @@ const state = {
     allWellness: [],
     allAge: [],
     allGender: [],
+
+    // Bloodless Blood Tests & Risk Proxies
+    allHemoglobin: [],
+    allGlucose: [],
+    allHbA1c: [],
+    allHydration: [],
+    allCardioAge: [],
+    allVascularHealth: [],
+    allHypertensionRisk: [],
+    allCardiacIndex: [],
     scanPhase: 'face', // 'face' or 'vitals'
     goodMeasurements: 0,
     totalMeasurements: 0,
@@ -549,8 +559,15 @@ function showResultsScreen() {
         stress_index: median(state.allStress),
         sympathetic_activity: median(state.allSympathetic),
         parasympathetic_activity: median(state.allParasympathetic),
-        prq: median(state.allPRQ),
         wellness_score: median(state.allWellness),
+        hemoglobin: median(state.allHemoglobin),
+        glucose: median(state.allGlucose),
+        hba1c: median(state.allHbA1c),
+        hydration: median(state.allHydration),
+        cardio_age: median(state.allCardioAge),
+        vascular_health: median(state.allVascularHealth),
+        cardiac_index: median(state.allCardiacIndex),
+        htn_risk: state.allHypertensionRisk.length > 0 ? (counts => Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b))(state.allHypertensionRisk.reduce((acc, r) => ({ ...acc, [r]: (acc[r] || 0) + 1 }), {})) : 'Unknown'
     };
 
     if (!v.heart_rate && state.allHR.length === 0) {
@@ -568,41 +585,69 @@ function showResultsScreen() {
     }
 
     function getHealthMetricInfo(val, label) {
-        if (val === null || val === undefined) return { color: '#94a3b8', status: 'N/A' };
+        if (val === null || val === undefined) return { color: '#94a3b8', status: '' };
         switch (label) {
             case 'Heart Rate':
                 if (val >= 60 && val <= 100) return { color: '#10b981', status: 'Normal' };
                 return { color: '#ef4444', status: val < 60 ? 'Low' : 'High' };
-            case 'Breathing Rate':
-                if (val >= 12 && val <= 20) return { color: '#10b981', status: 'Normal' };
-                return { color: '#ef4444', status: 'Irregular' };
             case 'SpO2':
                 if (val >= 95) return { color: '#10b981', status: 'Excellent' };
                 return { color: '#f59e0b', status: 'Low' };
-            case 'Stress Index':
-                if (val < 150) return { color: '#10b981', status: 'Relaxed' };
-                if (val < 500) return { color: '#f59e0b', status: 'Moderate' };
-                return { color: '#ef4444', status: 'High' };
+            case 'Hemoglobin':
+                if (val >= 13.5 && val <= 17.5) return { color: '#10b981', status: 'Normal' };
+                return { color: '#ef4444', status: 'Imbalanced' };
+            case 'Glucose':
+                if (val < 140) return { color: '#10b981', status: 'Normal' };
+                return { color: '#f59e0b', status: 'Elevated' };
             case 'Wellness Score':
                 if (val >= 7.5) return { color: '#10b981', status: 'Optimal' };
-                if (val >= 5.0) return { color: '#f59e0b', status: 'Fair' };
-                return { color: '#ef4444', status: 'Low' };
+                return { color: '#ef4444', status: 'Action Needed' };
             default: return { color: '#94a3b8', status: '' };
         }
     }
 
-    const results = [
-        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
-        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
-        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
-        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%' },
-        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F' },
-        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms' },
-        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
-        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%' },
-        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%' },
-        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '' },
-        { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10' },
+    const categories = [
+        {
+            title: "Vital Signs",
+            icon: "🩺",
+            items: [
+                { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
+                { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
+                { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
+                { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%' },
+                { icon: '🌡️', label: 'Skin Temp', value: fmt(v.skin_temp, 1), unit: '°F' },
+            ]
+        },
+        {
+            title: "Bloodless Blood Tests",
+            icon: "�",
+            items: [
+                { icon: '🧪', label: 'Hemoglobin', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
+                { icon: '🍬', label: 'Glucose', value: fmt(v.glucose), unit: 'mg/dL' },
+                { icon: '�', label: 'HbA1c', value: fmt(v.hba1c, 1), unit: '%' },
+                { icon: '💧', label: 'Hydration', value: fmt(v.hydration, 1), unit: '/ 10' },
+            ]
+        },
+        {
+            title: "Chronic Risk Factors",
+            icon: "⚠️",
+            items: [
+                { icon: '⌛', label: 'Cardio Age', value: v.cardio_age || '--', unit: 'Years' },
+                { icon: '🛡️', label: 'Vascular Health', value: fmt(v.vascular_health), unit: '%' },
+                { icon: '📈', label: 'HTN Risk', value: v.htn_risk, unit: 'Level' },
+                { icon: '🏎️', label: 'Cardiac Index', value: fmt(v.cardiac_index, 2), unit: 'L/min/m²' },
+            ]
+        },
+        {
+            title: "Mental Wellness",
+            icon: "🧘",
+            items: [
+                { icon: '�', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
+                { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%' },
+                { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%' },
+                { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10' },
+            ]
+        }
     ];
 
     const confidenceColor = confidence >= 80 ? '#10b981' : (confidence >= 50 ? '#fbbf24' : '#ef4444');
@@ -613,35 +658,46 @@ function showResultsScreen() {
     const genderIcon = estimatedGender === 'Male' ? '♂️' : estimatedGender === 'Female' ? '♀️' : '👤';
     const genderColor = estimatedGender === 'Male' ? '#3b82f6' : '#ec4899';
 
-    DOM.resultsGrid.innerHTML = `
+    let html = `
         <div class="result-card hero">
-            <div style="text-align: center;">
+            <div style="text-align: center; flex: 1;">
                 <div class="result-icon">🧬</div>
                 <div class="result-label">AI Profile Estimate</div>
                 <div class="result-value">~${estimatedAge || '--'} <span style="font-size: 1rem; color: #64748b;">Yrs</span></div>
                 <div class="result-unit" style="color: ${genderColor}">${genderIcon} ${estimatedGender || 'Unknown'}</div>
             </div>
             <div style="width: 1px; height: 80px; background: rgba(255,255,255,0.1);"></div>
-            <div style="text-align: center;">
+            <div style="text-align: center; flex: 1;">
                 <div class="result-icon">🎯</div>
                 <div class="result-label">Data Accuracy</div>
                 <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
                 <div class="result-unit">${state.goodMeasurements} / ${state.totalMeasurements} Quality Samples</div>
             </div>
         </div>
-    ` + results.map((r, i) => {
-        const info = getHealthMetricInfo(r.value === '--' || r.value.includes('/') ? null : parseFloat(r.value), r.label);
-        return `
-            <div class="result-card" style="animation-delay: ${0.05 * i}s">
-                <div class="result-icon">${r.icon}</div>
-                <div class="result-label">${r.label}</div>
-                <div class="result-value" style="color: ${info.color === '#94a3b8' ? 'white' : info.color}">${r.value}</div>
-                <div class="result-unit">${r.unit}</div>
-                ${info.status ? `<div class="result-status" style="color: ${info.color}; background: ${info.color}15">${info.status}</div>` : ''}
+    `;
+
+    categories.forEach(cat => {
+        html += `
+            <div style="grid-column: 1 / -1; margin: 32px 0 16px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 1.5rem;">${cat.icon}</span>
+                <h3 style="margin: 0; font-size: 1.25rem; letter-spacing: 0.05em; color: #94a3b8; text-transform: uppercase;">${cat.title}</h3>
             </div>
         `;
-    }).join('');
+        cat.items.forEach((r, i) => {
+            const info = getHealthMetricInfo(r.value === '--' || r.value.includes('/') ? null : parseFloat(r.value), r.label);
+            html += `
+                <div class="result-card" style="animation-delay: ${0.05 * i}s">
+                    <div class="result-icon">${r.icon}</div>
+                    <div class="result-label">${r.label}</div>
+                    <div class="result-value" style="color: ${info.color === '#94a3b8' ? 'white' : info.color}">${r.value}</div>
+                    <div class="result-unit">${r.unit}</div>
+                    ${info.status ? `<div class="result-status" style="color: ${info.color}; background: ${info.color}15">${info.status}</div>` : ''}
+                </div>
+            `;
+        });
+    });
 
+    DOM.resultsGrid.innerHTML = html;
     DOM.resultsOverlay.classList.add('visible');
 }
 
@@ -718,6 +774,16 @@ function handleMeasurement(data) {
         if (v.parasympathetic_activity != null) state.allParasympathetic.push(v.parasympathetic_activity);
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
+
+        // Advanced AI Proxies
+        if (v.hemoglobin != null) state.allHemoglobin.push(v.hemoglobin);
+        if (v.blood_glucose != null) state.allGlucose.push(v.blood_glucose);
+        if (v.hba1c != null) state.allHbA1c.push(v.hba1c);
+        if (v.hydration_index != null) state.allHydration.push(v.hydration_index);
+        if (v.cardio_age != null) state.allCardioAge.push(v.cardio_age);
+        if (v.vascular_health != null) state.allVascularHealth.push(v.vascular_health);
+        if (v.hypertension_risk != null) state.allHypertensionRisk.push(v.hypertension_risk);
+        if (v.cardiac_index != null) state.allCardiacIndex.push(v.cardiac_index);
 
         // ACCURACY-BASED COMPLETION -> Stop when we have stable, high-quality data
         if (state.isRunning && isDataAccurate(v, data.quality)) {

@@ -29,7 +29,6 @@ class VitalSigns(BaseModel):
     hrv_pnn50: Optional[float] = Field(None, description="HRV pNN50 percentage")
     spo2_estimate: Optional[float] = Field(None, description="SpO2 estimate (experimental)")
     
-    # New Advanced Metrics
     blood_pressure_sys: Optional[float] = Field(None, description="Systolic BP (estimated)")
     blood_pressure_dia: Optional[float] = Field(None, description="Diastolic BP (estimated)")
     stress_index: Optional[float] = Field(None, description="Baevsky Stress Index")
@@ -40,6 +39,16 @@ class VitalSigns(BaseModel):
     parasympathetic_activity: Optional[float] = Field(None, description="Parasympathetic nervous system activity (0-100)")
     prq: Optional[float] = Field(None, description="Parasympathetic Recovery Quotient")
     wellness_score: Optional[float] = Field(None, description="Overall wellness score (0-10)")
+
+    # Chronic Disease Risks & Bloodless Blood Tests (Advanced AI Proxies)
+    hemoglobin: Optional[float] = Field(None, description="Estimated Hemoglobin in g/dL")
+    blood_glucose: Optional[float] = Field(None, description="Blood glucose trend proxy (mg/dL)")
+    hba1c: Optional[float] = Field(None, description="Estimated HbA1c percentage")
+    hydration_index: Optional[float] = Field(None, description="Hydration index (0-10)")
+    cardio_age: Optional[int] = Field(None, description="Estimated cardiovascular age")
+    vascular_health: Optional[float] = Field(None, description="Vascular health score (0-100)")
+    hypertension_risk: Optional[str] = Field(None, description="Hypertension risk level")
+    cardiac_index: Optional[float] = Field(None, description="Estimated Cardiac Index")
 
 
 class SignalQualityMetrics(BaseModel):

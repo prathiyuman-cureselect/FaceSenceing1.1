@@ -169,9 +169,8 @@ class RPPGEngine:
         vitals.stress_index = hrv_metrics["stress_index"]
         vitals.lf_hf_ratio = hrv_metrics["lf_hf_ratio"]
 
-        # 2. Blood Pressure (Multi-factor Estimated)
+        # 2. Blood Pressure (Estimated)
         if vitals.heart_rate:
-            # use signal amplitude as proxy for pulse pressure
             amp = np.std(hr_filtered)
             sys, dia = self.signal_processor.estimate_bp(
                 vitals.heart_rate,
@@ -182,51 +181,56 @@ class RPPGEngine:
             vitals.blood_pressure_sys = sys
             vitals.blood_pressure_dia = dia
 
-        # 3. Perfusion Index
+        # 3. Perfusion Index & Temperature
         vitals.perfusion_index = self.signal_processor.compute_perfusion_index(
             hr_filtered, np.mean(rgb_array, axis=0)
         )
-
-        # 4. Temperature
         vitals.skin_temp = self.signal_processor.estimate_skin_temp(self._rgb_buffer[-1])
 
-        # 5. Experimental SpO2
+        # 4. SpO2
         vitals.spo2_estimate = self.signal_processor.estimate_spo2(
             rgb_array[:, 0],  # Red channel
             rgb_array[:, 2],  # Blue channel
         )
 
-        # 6. Sympathetic & Parasympathetic Activity (from LF/HF ratio)
+        # 5. SNS / PNS Activity
         if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
             total = vitals.lf_hf_ratio + 1.0
             vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
             vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
-        elif vitals.stress_index is not None:
-            # Fallback: derive from stress index
-            stress_pct = min(100, (vitals.stress_index / 10.0))
-            vitals.sympathetic_activity = round(stress_pct, 1)
-            vitals.parasympathetic_activity = round(100 - stress_pct, 1)
+        
+        # 6. Bloodless Blood Tests (AI Proxies)
+        # Hemoglobin (Hb): often correlated with R/G ratio in skin reflectance
+        r_g_ratio = np.mean(rgb_array[:, 0]) / (np.mean(rgb_array[:, 1]) + 1e-10)
+        vitals.hemoglobin = round(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)), 1)
+        
+        # Glucose Trend: experimental morphological proxy
+        vitals.blood_glucose = round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0)
+        vitals.hba1c = round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1)
+        
+        # Hydration: based on absorption variance
+        vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_array[:, 2]) * 100)), 1)
 
-        # 7. PRQ (Parasympathetic Recovery Quotient)
-        if vitals.parasympathetic_activity is not None and vitals.heart_rate:
-            # PRQ = parasympathetic strength relative to cardiac demand
-            vitals.prq = round((vitals.parasympathetic_activity / max(vitals.heart_rate, 1)) * 10, 2)
+        # 7. Chronic Disease Risks & Cardio Age
+        base_age = getattr(self, '_last_age', 30)
+        vitals.cardio_age = int(base_age + (vitals.stress_index / 100 if vitals.stress_index else 0))
+        
+        # Hypertension Risk
+        if vitals.blood_pressure_sys:
+            if vitals.blood_pressure_sys > 140: vitals.hypertension_risk = "High"
+            elif vitals.blood_pressure_sys > 130: vitals.hypertension_risk = "Elevated"
+            else: vitals.hypertension_risk = "Low"
+            
+        vitals.vascular_health = round(max(0, min(100, 100 - (vitals.cardio_age - base_age) * 10)), 1)
+        
+        # Cardiac Index estimation (Volume proxy)
+        vitals.cardiac_index = round(max(2.0, min(4.5, 3.0 + (vitals.heart_rate - 70) * 0.01 if vitals.heart_rate else 0)), 2)
 
-        # 8. Wellness Score (composite 0-10)
+        # 8. Composite Wellness Score
         ws_components = []
-        if vitals.heart_rate:
-            # HR score: 60-80 is ideal
-            hr_score = max(0, 10 - abs(vitals.heart_rate - 70) * 0.2)
-            ws_components.append(hr_score)
-        if vitals.spo2_estimate:
-            spo2_score = max(0, (vitals.spo2_estimate - 90) * 1.0)
-            ws_components.append(spo2_score)
-        if vitals.stress_index is not None:
-            stress_score = max(0, 10 - vitals.stress_index / 100)
-            ws_components.append(stress_score)
-        if vitals.hrv_rmssd is not None:
-            hrv_score = min(10, vitals.hrv_rmssd / 5)
-            ws_components.append(hrv_score)
+        if vitals.heart_rate: ws_components.append(max(0, 10 - abs(vitals.heart_rate - 70) * 0.2))
+        if vitals.stress_index: ws_components.append(max(0, 10 - vitals.stress_index / 100))
+        if vitals.vascular_health: ws_components.append(vitals.vascular_health / 10.0)
         if ws_components:
             vitals.wellness_score = round(sum(ws_components) / len(ws_components), 1)
 

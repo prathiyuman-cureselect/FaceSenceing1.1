@@ -155,43 +155,50 @@ class FaceDetector:
 
     def extract_roi(
         self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Dict[str, np.ndarray]:
         """
-        Extract forehead and cheek ROIs from detected face.
-
-        Returns:
-            Tuple of (forehead_roi, cheek_roi) as BGR images.
+        Extract refined Forehead and Cheek ROIs.
+        Avoids the T-zone (eyes/nose) which contains high specular reflection.
         """
         x, y, w, h = face_rect
+        h_orig, w_orig = frame.shape[:2]
 
-        # Forehead region
-        fh_y1 = max(0, y + int(h * self.config.forehead_ratio_top))
-        fh_y2 = y + int(h * self.config.forehead_ratio_bottom)
-        fh_x1 = max(0, x + int(w * self.config.forehead_ratio_left))
-        fh_x2 = x + int(w * self.config.forehead_ratio_right)
+        # 1. Forehead: Central top part of the face
+        fh_y1 = max(0, y + int(h * 0.05))
+        fh_y2 = y + int(h * 0.22)
+        fh_x1 = x + int(w * 0.3)
+        fh_x2 = x + int(w * 0.7)
+        
+        # 2. Left Cheek: Center-left
+        lc_y1 = y + int(h * 0.45)
+        lc_y2 = y + int(h * 0.70)
+        lc_x1 = x + int(w * 0.15)
+        lc_x2 = x + int(w * 0.35)
 
-        # Cheek region
-        ck_y1 = y + int(h * self.config.cheek_ratio_top)
-        ck_y2 = min(frame.shape[0], y + int(h * self.config.cheek_ratio_bottom))
-        ck_x1 = max(0, x + int(w * self.config.cheek_ratio_left))
-        ck_x2 = min(frame.shape[1], x + int(w * self.config.cheek_ratio_right))
+        # 3. Right Cheek: Center-right
+        rc_y1 = y + int(h * 0.45)
+        rc_y2 = y + int(h * 0.70)
+        rc_x1 = x + int(w * 0.65)
+        rc_x2 = x + int(w * 0.85)
 
-        forehead = frame[fh_y1:fh_y2, fh_x1:fh_x2]
-        cheek = frame[ck_y1:ck_y2, ck_x1:ck_x2]
-
-        return forehead, cheek
+        rois = {
+            "forehead": frame[fh_y1:fh_y2, max(0, fh_x1):min(w_orig, fh_x2)],
+            "left_cheek": frame[max(0, lc_y1):min(h_orig, lc_y2), max(0, lc_x1):min(w_orig, lc_x2)],
+            "right_cheek": frame[max(0, rc_y1):min(h_orig, rc_y2), max(0, rc_x1):min(w_orig, rc_x2)],
+        }
+        
+        return rois
 
     def get_skin_mask(self, roi: np.ndarray) -> np.ndarray:
         """
-        Create skin-color mask using YCrCb color space.
-        Loosened range for better performance in clinical/home lighting.
+        Precise skin-color mask using YCrCb.
         """
         if roi.size == 0:
             return np.array([])
 
         ycrcb = cv2.cvtColor(roi, cv2.COLOR_BGR2YCrCb)
-        # Expanded range for Cr and Cb to handle varied skin tones and lighting
-        mask = cv2.inRange(ycrcb, (0, 130, 70), (255, 180, 135))
+        # Tighter range for skin-only detection to avoid lips or shadows
+        mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
 
         # Morphological cleanup
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -203,25 +210,28 @@ class FaceDetector:
         self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
     ) -> Optional[np.ndarray]:
         """
-        Extract mean RGB values with skin-masking and fallback.
+        Extract pulse-rich RGB averages from refined skin ROIs.
+        Uses spatial averaging and skin-masking.
         """
-        forehead, cheek = self.extract_roi(frame, face_rect)
+        rois = self.extract_roi(frame, face_rect)
 
         signals = []
-        for roi in [forehead, cheek]:
+        for name, roi in rois.items():
             if roi.size == 0:
                 continue
                 
             mask = self.get_skin_mask(roi)
             
             # If mask is good, use it (precise)
-            if mask.size > 0 and np.count_nonzero(mask) > 50:
+            if mask.size > 0 and np.count_nonzero(mask) > 20:
+                # We calculate mean across masked regions
+                # Green channel is the primary carrier of the pulse signal in rPPG
                 b = np.mean(roi[:, :, 0][mask > 0])
                 g = np.mean(roi[:, :, 1][mask > 0])
                 r = np.mean(roi[:, :, 2][mask > 0])
                 signals.append(np.array([r, g, b]))
             else:
-                # Fallback: Use center region of the ROI as it's likely skin
+                # Fallback: Just the center of the ROI
                 h, w = roi.shape[:2]
                 center_roi = roi[h//4:3*h//4, w//4:3*w//4]
                 if center_roi.size > 0:
@@ -231,17 +241,9 @@ class FaceDetector:
                     signals.append(np.array([r, g, b]))
 
         if not signals:
-            # Ultimate fallback: just return the mean of the entire face bounding box
-            x, y, w, h = face_rect
-            face_roi = frame[y:y+h, x:x+w]
-            if face_roi.size > 0:
-                r = np.mean(face_roi[:, :, 2])
-                g = np.mean(face_roi[:, :, 1])
-                b = np.mean(face_roi[:, :, 0])
-                return np.array([r, g, b])
             return None
 
-        # Average across ROIs
+        # Return mean RGB values across all ROIs
         return np.mean(signals, axis=0)
 
     def estimate_age(self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]) -> Optional[int]:
