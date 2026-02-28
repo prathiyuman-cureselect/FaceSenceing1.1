@@ -318,15 +318,14 @@ class SignalProcessor:
 
         # ── Factor 1: Heart Rate deviation ──
         # Resting baseline. Higher HR strongly correlates with elevated BP. 
-        # Multipliers drastically increased to allow BP to fluctuate naturally.
         hr_dev = hr - 70.0
-        hr_sys_contrib = hr_dev * 1.2
-        hr_dia_contrib = hr_dev * 0.6
+        hr_sys_contrib = hr_dev * 0.6
+        hr_dia_contrib = hr_dev * 0.3
 
         # ── Factor 2: Pulse Amplitude (AC component) ──
         # Hypertensive flow creates distinctly harder pulsatile peaks on the face
-        amp_sys_contrib = pulse_amplitude * 15.0
-        amp_dia_contrib = pulse_amplitude * 5.0
+        amp_sys_contrib = pulse_amplitude * 8.0
+        amp_dia_contrib = pulse_amplitude * 3.0
 
         # ── Factor 3: Pulse Wave Variability (beat-to-beat stiffness) ──
         pwv_contrib_sys = 0.0
@@ -342,16 +341,16 @@ class SignalProcessor:
                 peak_mean = np.mean(peaks)
                 if peak_mean > 0:
                     variability = peak_std / peak_mean
-                    pwv_contrib_sys = variability * 40.0
-                    pwv_contrib_dia = variability * 20.0
+                    pwv_contrib_sys = variability * 20.0
+                    pwv_contrib_dia = variability * 10.0
 
         # ── Factor 4: Signal Energy ──
         energy_contrib_sys = 0.0
         energy_contrib_dia = 0.0
         if hr_filtered is not None and len(hr_filtered) > 30:
             signal_energy = np.sum(hr_filtered ** 2) / len(hr_filtered)
-            energy_contrib_sys = min(signal_energy * 25.0, 30.0)
-            energy_contrib_dia = min(signal_energy * 10.0, 15.0)
+            energy_contrib_sys = min(signal_energy * 12.0, 20.0)
+            energy_contrib_dia = min(signal_energy * 5.0, 10.0)
 
         # ── Factor 5: Red Channel Intensity (vasodilation/flushing proxy) ──
         red_contrib_sys = 0.0
@@ -363,8 +362,8 @@ class SignalProcessor:
                 rg_ratio = red_mean / green_mean
                 # High R/G strongly indicates facial flushing typical of high BP
                 if rg_ratio > 1.05:
-                    red_contrib_sys = (rg_ratio - 1.05) * 60.0
-                    red_contrib_dia = (rg_ratio - 1.05) * 35.0
+                    red_contrib_sys = (rg_ratio - 1.05) * 30.0
+                    red_contrib_dia = (rg_ratio - 1.05) * 15.0
 
         # ── Combine all factors ──
         sbp = (

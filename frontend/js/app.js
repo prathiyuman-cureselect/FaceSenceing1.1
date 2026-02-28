@@ -433,7 +433,7 @@ function startFrameCapture() {
         } else {
             // If in vitals phase, show progress. Otherwise show seconds.
             if (state.scanPhase === 'vitals') {
-                const progress = Math.min(100, (state.allHR.length / 6) * 100).toFixed(0);
+                const progress = Math.min(100, (state.allHR.length / 15) * 100).toFixed(0);
                 if (DOM.timerText) DOM.timerText.textContent = `💓 Fetching Vitals... ${progress}%`;
                 if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
             } else {
@@ -689,8 +689,8 @@ function handleMeasurement(data) {
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
 
-        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (just 6 frames = fraction of a second)
-        if (state.allHR.length >= 6 && state.isRunning) {
+        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (15 frames = 1.5 seconds of pure extracted signals)
+        if (state.allHR.length >= 15 && state.isRunning) {
             if (DOM.timerText) DOM.timerText.textContent = `✅ Status: DONE!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
