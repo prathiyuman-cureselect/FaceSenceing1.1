@@ -390,14 +390,16 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 40; // Fallback maximum time
+    state.timeLeft = 35; // Binah.ai standard: 30-60s recording
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
     ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness', 'allAge', 'allGender'].forEach(k => state[k] = []);
+
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
-    if (DOM.timerChip) DOM.timerChip.style.background = '#7c3aed'; // Purple for face scan phase
-    if (DOM.timerText) DOM.timerText.textContent = `👤 Detecting Face...`;
+    if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
+    if (DOM.timerText) DOM.timerText.textContent = `🔬 Step 1: Face Detection...`;
+    updateMessage('Step 1: Detecting face and selecting Region of Interest (ROI)', 'info');
     state.scanPhase = 'face';
 
     state.scanTimerInterval = setInterval(() => {
@@ -405,13 +407,20 @@ function startFrameCapture() {
 
         if (state.timeLeft <= 0) {
             clearInterval(state.scanTimerInterval);
+            if (DOM.timerText) DOM.timerText.textContent = `✅ Step 5: Results Ready!`;
+            if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
-        } else if (state.scanPhase === 'face') {
-            if (DOM.timerText) DOM.timerText.textContent = `👤 Analyzing Face... ${state.timeLeft}s`;
-        } else if (state.scanPhase === 'vitals') {
-            const progress = Math.min(100, (state.allHR.length / 25) * 100).toFixed(0);
-            if (DOM.timerText) DOM.timerText.textContent = `💓 Sensing... ${progress}%`;
-            if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
+        } else {
+            // Simulate the 4 phases over 35 seconds
+            if (state.timeLeft > 25) { // 35 down to 25 : Face Detection & Light Capture
+                if (DOM.timerText) DOM.timerText.textContent = `🔬 Step 2: Light Reflection (${state.timeLeft}s)`;
+            } else if (state.timeLeft > 15) { // 25 down to 15 : Signal Processing
+                if (DOM.timerText) DOM.timerText.textContent = `🔬 Step 3: rPPG Signal Processing (${state.timeLeft}s)`;
+            } else if (state.timeLeft > 5) { // 15 down to 5 : POS Algorithm + AI filtering
+                if (DOM.timerText) DOM.timerText.textContent = `🔬 Step 4: AI & ML Analysis (${state.timeLeft}s)`;
+            } else { // 5 down to 0 : Finalizing
+                if (DOM.timerText) DOM.timerText.textContent = `🔬 Finalizing Data... (${state.timeLeft}s)`;
+            }
         }
     }, 1000);
 }
@@ -657,21 +666,18 @@ function handleMeasurement(data) {
         if (v.parasympathetic_activity != null) state.allParasympathetic.push(v.parasympathetic_activity);
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
-
-        // Instant completion: 25 stable readings takes ~1-3 seconds after buffer fills
-        if (state.allHR.length >= 25 && state.isRunning) {
-            if (DOM.timerText) DOM.timerText.textContent = `✅ Done!`;
-            if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
-            autoCompleteSession();
-        }
     } else if (data.vitals) {
         state.totalMeasurements++;
     }
 
-    // Dynamic Phase Switching: Switch from 'face' to 'vitals' once backend sends vitals OR buffer fills
+    // Phase Switching updates for the UI
     if (state.scanPhase === 'face' && state.allAge.length > 0 && data.buffer_fill > 90) {
         state.scanPhase = 'vitals';
-        updateMessage('💓 Sensors active! Hold still for instant results...', 'info');
+        updateMessage('Step 2: Capturing RGB Light Reflection... keep still', 'info');
+    } else if (state.scanPhase === 'vitals' && state.timeLeft === 15) {
+        updateMessage('Step 3: Processing signals and filtering noise...', 'info');
+    } else if (state.scanPhase === 'vitals' && state.timeLeft === 5) {
+        updateMessage('Step 4: AI Regression Models analyzing vitals...', 'info');
     }
 
     // Age & Gender estimation — accumulate regardless of quality

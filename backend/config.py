@@ -46,9 +46,9 @@ class SignalConfig:
 @dataclass
 class FilterConfig:
     """Butterworth filter parameters."""
-    # Heart rate band: 0.7 Hz (42 bpm) to 3.5 Hz (210 bpm)
+    # Heart rate band: 0.7 Hz (42 bpm) to 4.0 Hz (240 bpm)
     hr_low_freq: float = 0.7
-    hr_high_freq: float = 3.5
+    hr_high_freq: float = 4.0
     hr_filter_order: int = 4
 
     # Respiratory rate band: 0.1 Hz (6 brpm) to 0.5 Hz (30 brpm)
