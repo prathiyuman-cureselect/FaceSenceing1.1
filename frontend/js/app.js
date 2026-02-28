@@ -509,8 +509,35 @@ function median(arr) {
     return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function showResultsScreen() {
+/**
+ * Enhanced accuracy check
+ * Stops the scan only when signal is stable AND quality is high.
+ */
+function isDataAccurate(vitals, quality) {
+    if (!vitals || !quality) return false;
 
+    // Requirement 1: Minimum sample size for statistical significance
+    if (state.allHR.length < 25) return false;
+
+    // Requirement 2: High signal quality (SNR > 6dB or Excellent/Good level)
+    const isQualityHigh = quality.is_acceptable && (quality.snr_db > 6 || quality.overall_level === 'EXCELLENT');
+    if (!isQualityHigh) return false;
+
+    // Requirement 3: Reading Stability (low variance in last 8 heart rate samples)
+    const lastSamples = state.allHR.slice(-8);
+    if (lastSamples.length < 8) return false;
+
+    const mean = lastSamples.reduce((a, b) => a + b, 0) / lastSamples.length;
+    const variance = lastSamples.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / lastSamples.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Target: SD < 1.5 BPM (very stable)
+    const stable = stdDev < 1.5;
+
+    return stable && isQualityHigh;
+}
+
+function showResultsScreen() {
     const v = {
         heart_rate: median(state.allHR),
         respiratory_rate: median(state.allRR),
@@ -527,90 +554,93 @@ function showResultsScreen() {
     };
 
     if (!v.heart_rate && state.allHR.length === 0) {
-        alert('No data was captured. Please try again with good lighting, stay completely still, and ensure your face is clearly visible.');
+        alert('No data was captured. Please try again with good lighting and stay completely still.');
         DOM.startupOverlay.classList.remove('hidden');
         DOM.btnStart.disabled = false;
         return;
     }
 
-    // Confidence score: % of measurements that were high quality
     const confidence = state.totalMeasurements > 0
         ? Math.round((state.goodMeasurements / state.totalMeasurements) * 100) : 0;
 
     function fmt(val, decimals = 0) {
         return (val !== null && val !== undefined) ? Number(val).toFixed(decimals) : '--';
     }
-    function statusColor(val, low, high) {
-        if (val === null || val === undefined) return '#64748b';
-        if (val >= low && val <= high) return '#10b981';
-        return '#ef4444';
-    }
-    function statusLabel(val, low, high) {
-        if (val === null || val === undefined) return 'N/A';
-        if (val >= low && val <= high) return 'Normal';
-        if (val < low) return 'Low';
-        return 'High';
+
+    function getHealthMetricInfo(val, label) {
+        if (val === null || val === undefined) return { color: '#94a3b8', status: 'N/A' };
+        switch (label) {
+            case 'Heart Rate':
+                if (val >= 60 && val <= 100) return { color: '#10b981', status: 'Normal' };
+                return { color: '#ef4444', status: val < 60 ? 'Low' : 'High' };
+            case 'Breathing Rate':
+                if (val >= 12 && val <= 20) return { color: '#10b981', status: 'Normal' };
+                return { color: '#ef4444', status: 'Irregular' };
+            case 'SpO2':
+                if (val >= 95) return { color: '#10b981', status: 'Excellent' };
+                return { color: '#f59e0b', status: 'Low' };
+            case 'Stress Index':
+                if (val < 150) return { color: '#10b981', status: 'Relaxed' };
+                if (val < 500) return { color: '#f59e0b', status: 'Moderate' };
+                return { color: '#ef4444', status: 'High' };
+            case 'Wellness Score':
+                if (val >= 7.5) return { color: '#10b981', status: 'Optimal' };
+                if (val >= 5.0) return { color: '#f59e0b', status: 'Fair' };
+                return { color: '#ef4444', status: 'Low' };
+            default: return { color: '#94a3b8', status: '' };
+        }
     }
 
     const results = [
-        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM', color: statusColor(v.heart_rate, 60, 100), status: statusLabel(v.heart_rate, 60, 100), samples: state.allHR.length },
-        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min', color: statusColor(v.respiratory_rate, 12, 20), status: statusLabel(v.respiratory_rate, 12, 20), samples: state.allRR.length },
-        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg', color: statusColor(v.blood_pressure_sys, 90, 140), status: statusLabel(v.blood_pressure_sys, 90, 140), samples: state.allSys.length },
-        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%', color: statusColor(v.spo2_estimate, 95, 100), status: statusLabel(v.spo2_estimate, 95, 100), samples: state.allSpo2.length },
-        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F', color: statusColor(v.skin_temp, 97.0, 99.5), status: statusLabel(v.skin_temp, 97.0, 99.5), samples: state.allTemp.length },
-        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms', color: statusColor(v.hrv_rmssd, 20, 200), status: statusLabel(v.hrv_rmssd, 20, 200), samples: state.allHRV.length },
-        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI', color: statusColor(v.stress_index, 0, 500), status: v.stress_index > 500 ? 'High Stress' : (v.stress_index > 150 ? 'Moderate' : 'Relaxed'), samples: state.allStress.length },
-        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%', color: '#f87171', status: '', samples: state.allSympathetic.length },
-        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%', color: '#60a5fa', status: '', samples: state.allParasympathetic.length },
-        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '', color: '#a78bfa', status: '', samples: state.allPRQ.length },
-        { icon: '💚', label: 'Wellness', value: fmt(v.wellness_score, 1), unit: '/ 10', color: v.wellness_score >= 7 ? '#34d399' : (v.wellness_score >= 4 ? '#fbbf24' : '#ef4444'), status: v.wellness_score >= 7 ? 'Good' : (v.wellness_score >= 4 ? 'Fair' : 'Poor'), samples: state.allWellness.length },
+        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
+        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
+        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
+        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%' },
+        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F' },
+        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms' },
+        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
+        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%' },
+        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%' },
+        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '' },
+        { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10' },
     ];
 
-    const confidenceColor = confidence >= 70 ? '#10b981' : (confidence >= 40 ? '#fbbf24' : '#ef4444');
-    const confidenceLabel = confidence >= 70 ? 'HIGH' : (confidence >= 40 ? 'MEDIUM' : 'LOW');
+    const confidenceColor = confidence >= 80 ? '#10b981' : (confidence >= 50 ? '#fbbf24' : '#ef4444');
     const estimatedAge = median(state.allAge);
-
-    // Gender: use mode (most frequent value)
     const genderCounts = {};
     state.allGender.forEach(g => { genderCounts[g] = (genderCounts[g] || 0) + 1; });
     const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || null;
-    const genderIcon = estimatedGender === 'Male' ? '♂️' : estimatedGender === 'Female' ? '♀️' : '❓';
+    const genderIcon = estimatedGender === 'Male' ? '♂️' : estimatedGender === 'Female' ? '♀️' : '👤';
     const genderColor = estimatedGender === 'Male' ? '#3b82f6' : '#ec4899';
 
     DOM.resultsGrid.innerHTML = `
-        <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid #8b5cf6; background: linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05));">
-            <div style="display: flex; justify-content: center; align-items: center; gap: 32px; flex-wrap: wrap;">
-                <div style="text-align: center;">
-                    <div class="result-icon" style="font-size: 2.2rem;">👤</div>
-                    <div class="result-label">Estimated Age</div>
-                    <div class="result-value" style="color: #8b5cf6; font-size: 2.2rem;">~${estimatedAge ? estimatedAge : '--'}</div>
-                    <div class="result-unit">years old</div>
-                </div>
-                <div style="width: 1px; height: 60px; background: rgba(0,0,0,0.1);"></div>
-                <div style="text-align: center;">
-                    <div class="result-icon" style="font-size: 2.2rem;">${genderIcon}</div>
-                    <div class="result-label">Gender</div>
-                    <div class="result-value" style="color: ${genderColor}; font-size: 2.2rem;">${estimatedGender || '--'}</div>
-                    <div class="result-unit">${state.allGender.length} face samples</div>
-                </div>
+        <div class="result-card hero">
+            <div style="text-align: center;">
+                <div class="result-icon">🧬</div>
+                <div class="result-label">AI Profile Estimate</div>
+                <div class="result-value">~${estimatedAge || '--'} <span style="font-size: 1rem; color: #64748b;">Yrs</span></div>
+                <div class="result-unit" style="color: ${genderColor}">${genderIcon} ${estimatedGender || 'Unknown'}</div>
+            </div>
+            <div style="width: 1px; height: 80px; background: rgba(255,255,255,0.1);"></div>
+            <div style="text-align: center;">
+                <div class="result-icon">🎯</div>
+                <div class="result-label">Data Accuracy</div>
+                <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
+                <div class="result-unit">${state.goodMeasurements} / ${state.totalMeasurements} Quality Samples</div>
             </div>
         </div>
-        <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid ${confidenceColor};">
-            <div class="result-icon">🎯</div>
-            <div class="result-label">Measurement Confidence</div>
-            <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
-            <div class="result-unit">${confidenceLabel} · ${state.goodMeasurements} of ${state.totalMeasurements} frames accepted</div>
-        </div>
-    ` + results.map(r => `
-        <div class="result-card">
-            <div class="result-icon">${r.icon}</div>
-            <div class="result-label">${r.label}</div>
-            <div class="result-value" style="color: ${r.color}">${r.value}</div>
-            <div class="result-unit">${r.unit}</div>
-            ${r.status ? `<div class="result-status" style="color: ${r.color}">${r.status}</div>` : ''}
-            <div class="result-samples">${r.samples} samples</div>
-        </div>
-    `).join('');
+    ` + results.map((r, i) => {
+        const info = getHealthMetricInfo(r.value === '--' || r.value.includes('/') ? null : parseFloat(r.value), r.label);
+        return `
+            <div class="result-card" style="animation-delay: ${0.05 * i}s">
+                <div class="result-icon">${r.icon}</div>
+                <div class="result-label">${r.label}</div>
+                <div class="result-value" style="color: ${info.color === '#94a3b8' ? 'white' : info.color}">${r.value}</div>
+                <div class="result-unit">${r.unit}</div>
+                ${info.status ? `<div class="result-status" style="color: ${info.color}; background: ${info.color}15">${info.status}</div>` : ''}
+            </div>
+        `;
+    }).join('');
 
     DOM.resultsOverlay.classList.add('visible');
 }
@@ -689,9 +719,9 @@ function handleMeasurement(data) {
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
 
-        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (15 frames = 1.5 seconds of pure extracted signals)
-        if (state.allHR.length >= 15 && state.isRunning) {
-            if (DOM.timerText) DOM.timerText.textContent = `✅ Status: DONE!`;
+        // ACCURACY-BASED COMPLETION -> Stop when we have stable, high-quality data
+        if (state.isRunning && isDataAccurate(v, data.quality)) {
+            if (DOM.timerText) DOM.timerText.textContent = `✨ Accuracy Target Reached!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
         }
