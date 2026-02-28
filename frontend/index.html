@@ -28,16 +28,16 @@
                 Sit still, face the camera, and let the AI scan your face.
             </p>
             <div class="startup-features">
-                <span class="feature-chip">❤️ Heart Rate</span>
-                <span class="feature-chip">🩺 Blood Pressure</span>
-                <span class="feature-chip">🩸 SpO2</span>
-                <span class="feature-chip">🌡️ Temperature</span>
-                <span class="feature-chip">🧠 Stress</span>
-                <span class="feature-chip">💚 Wellness</span>
+                <span class="feature-chip">Heart Rate</span>
+                <span class="feature-chip">Blood Pressure</span>
+                <span class="feature-chip">SpO2</span>
+                <span class="feature-chip">Temperature</span>
+                <span class="feature-chip">Stress</span>
+                <span class="feature-chip">Wellness</span>
             </div>
 
             <button class="btn btn-primary btn-start-custom" id="btnStart">
-                🔬 Start Scan (30 seconds)
+                🔬 Start Scan (60 seconds)
             </button>
             <p class="startup-disclaimer">
                 🔒 Camera only · Video never leaves your device · Not for clinical diagnosis
@@ -103,8 +103,6 @@
             </div>
             <div class="video-wrapper" id="videoWrapper">
                 <video id="videoFeed" autoplay playsinline muted></video>
-                <canvas id="blurCanvas"
-                    style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></canvas>
                 <canvas id="canvasHidden"></canvas>
                 <div class="video-overlay"></div>
                 <div class="video-status">

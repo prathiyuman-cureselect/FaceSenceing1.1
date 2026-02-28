@@ -65,7 +65,7 @@ const state = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     scanTimerInterval: null,
-    timeLeft: 30,
+    timeLeft: 60,
 
     // Vital histories (for sparklines)
     hrHistory: [],
@@ -78,13 +78,25 @@ const state = {
     spectrumData: [],
     spectrumFreqs: [],
 
-    // Face rect for blur
-    faceRect: null,
-
-    // Last received vitals (for results screen)
-    lastVitals: null,
-    lastQuality: null,
+    // Accumulation arrays — collect ALL measurements for median
+    allHR: [],
+    allRR: [],
+    allSys: [],
+    allDia: [],
+    allSpo2: [],
+    allTemp: [],
+    allHRV: [],
+    allSDNN: [],
+    allPNN50: [],
+    allStress: [],
+    allLFHF: [],
+    allPI: [],
+    allSympathetic: [],
+    allParasympathetic: [],
+    allPRQ: [],
+    allWellness: [],
     goodMeasurements: 0,
+    totalMeasurements: 0,
 };
 
 // ─── DOM References ───────────────────────────────────────────────────
@@ -99,7 +111,6 @@ const DOM = {
 
     videoFeed: document.getElementById('videoFeed'),
     canvas: document.getElementById('canvasHidden'),
-    blurCanvas: document.getElementById('blurCanvas'),
     videoWrapper: document.getElementById('videoWrapper'),
     faceGuideText: document.querySelector('#faceGuide span'),
     recChip: document.getElementById('recChip'),
@@ -376,8 +387,11 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 30;
+    state.timeLeft = 60;
     state.goodMeasurements = 0;
+    state.totalMeasurements = 0;
+    // Clear accumulation arrays
+    ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness'].forEach(k => state[k] = []);
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
     if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
     if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
@@ -451,21 +465,47 @@ async function autoCompleteSession() {
 }
 
 function showResultsScreen() {
-    const v = state.lastVitals;
-    if (!v) {
-        alert('No data was captured. Please try again with good lighting and stay still.');
+    // Compute median of all accumulated measurements
+    function median(arr) {
+        if (!arr || arr.length === 0) return null;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+
+    const v = {
+        heart_rate: median(state.allHR),
+        respiratory_rate: median(state.allRR),
+        blood_pressure_sys: median(state.allSys),
+        blood_pressure_dia: median(state.allDia),
+        spo2_estimate: median(state.allSpo2),
+        skin_temp: median(state.allTemp),
+        hrv_rmssd: median(state.allHRV),
+        stress_index: median(state.allStress),
+        sympathetic_activity: median(state.allSympathetic),
+        parasympathetic_activity: median(state.allParasympathetic),
+        prq: median(state.allPRQ),
+        wellness_score: median(state.allWellness),
+    };
+
+    if (!v.heart_rate && state.allHR.length === 0) {
+        alert('No data was captured. Please try again with good lighting, stay completely still, and ensure your face is clearly visible.');
         DOM.startupOverlay.classList.remove('hidden');
         DOM.btnStart.disabled = false;
         return;
     }
+
+    // Confidence score: % of measurements that were high quality
+    const confidence = state.totalMeasurements > 0
+        ? Math.round((state.goodMeasurements / state.totalMeasurements) * 100) : 0;
 
     function fmt(val, decimals = 0) {
         return (val !== null && val !== undefined) ? Number(val).toFixed(decimals) : '--';
     }
     function statusColor(val, low, high) {
         if (val === null || val === undefined) return '#64748b';
-        if (val >= low && val <= high) return '#10b981'; // green
-        return '#ef4444'; // red
+        if (val >= low && val <= high) return '#10b981';
+        return '#ef4444';
     }
     function statusLabel(val, low, high) {
         if (val === null || val === undefined) return 'N/A';
@@ -475,26 +515,37 @@ function showResultsScreen() {
     }
 
     const results = [
-        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM', color: statusColor(v.heart_rate, 60, 100), status: statusLabel(v.heart_rate, 60, 100) },
-        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min', color: statusColor(v.respiratory_rate, 12, 20), status: statusLabel(v.respiratory_rate, 12, 20) },
-        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg', color: statusColor(v.blood_pressure_sys, 90, 140), status: statusLabel(v.blood_pressure_sys, 90, 140) },
-        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%', color: statusColor(v.spo2_estimate, 95, 100), status: statusLabel(v.spo2_estimate, 95, 100) },
-        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F', color: statusColor(v.skin_temp, 97.0, 99.5), status: statusLabel(v.skin_temp, 97.0, 99.5) },
-        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms', color: statusColor(v.hrv_rmssd, 20, 200), status: statusLabel(v.hrv_rmssd, 20, 200) },
-        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI', color: statusColor(v.stress_index, 0, 500), status: v.stress_index > 500 ? 'High Stress' : (v.stress_index > 150 ? 'Moderate' : 'Relaxed') },
-        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%', color: '#f87171', status: '' },
-        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%', color: '#60a5fa', status: '' },
-        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '', color: '#a78bfa', status: '' },
-        { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10', color: v.wellness_score >= 7 ? '#34d399' : (v.wellness_score >= 4 ? '#fbbf24' : '#ef4444'), status: v.wellness_score >= 7 ? 'Good' : (v.wellness_score >= 4 ? 'Fair' : 'Poor') },
+        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM', color: statusColor(v.heart_rate, 60, 100), status: statusLabel(v.heart_rate, 60, 100), samples: state.allHR.length },
+        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min', color: statusColor(v.respiratory_rate, 12, 20), status: statusLabel(v.respiratory_rate, 12, 20), samples: state.allRR.length },
+        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg', color: statusColor(v.blood_pressure_sys, 90, 140), status: statusLabel(v.blood_pressure_sys, 90, 140), samples: state.allSys.length },
+        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%', color: statusColor(v.spo2_estimate, 95, 100), status: statusLabel(v.spo2_estimate, 95, 100), samples: state.allSpo2.length },
+        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F', color: statusColor(v.skin_temp, 97.0, 99.5), status: statusLabel(v.skin_temp, 97.0, 99.5), samples: state.allTemp.length },
+        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms', color: statusColor(v.hrv_rmssd, 20, 200), status: statusLabel(v.hrv_rmssd, 20, 200), samples: state.allHRV.length },
+        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI', color: statusColor(v.stress_index, 0, 500), status: v.stress_index > 500 ? 'High Stress' : (v.stress_index > 150 ? 'Moderate' : 'Relaxed'), samples: state.allStress.length },
+        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%', color: '#f87171', status: '', samples: state.allSympathetic.length },
+        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%', color: '#60a5fa', status: '', samples: state.allParasympathetic.length },
+        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '', color: '#a78bfa', status: '', samples: state.allPRQ.length },
+        { icon: '💚', label: 'Wellness', value: fmt(v.wellness_score, 1), unit: '/ 10', color: v.wellness_score >= 7 ? '#34d399' : (v.wellness_score >= 4 ? '#fbbf24' : '#ef4444'), status: v.wellness_score >= 7 ? 'Good' : (v.wellness_score >= 4 ? 'Fair' : 'Poor'), samples: state.allWellness.length },
     ];
 
-    DOM.resultsGrid.innerHTML = results.map(r => `
+    const confidenceColor = confidence >= 70 ? '#10b981' : (confidence >= 40 ? '#fbbf24' : '#ef4444');
+    const confidenceLabel = confidence >= 70 ? 'HIGH' : (confidence >= 40 ? 'MEDIUM' : 'LOW');
+
+    DOM.resultsGrid.innerHTML = `
+        <div class="result-card" style="grid-column: 1 / -1; border-top: 3px solid ${confidenceColor};">
+            <div class="result-icon">🎯</div>
+            <div class="result-label">Measurement Confidence</div>
+            <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
+            <div class="result-unit">${confidenceLabel} · ${state.goodMeasurements} of ${state.totalMeasurements} frames accepted</div>
+        </div>
+    ` + results.map(r => `
         <div class="result-card">
             <div class="result-icon">${r.icon}</div>
             <div class="result-label">${r.label}</div>
             <div class="result-value" style="color: ${r.color}">${r.value}</div>
             <div class="result-unit">${r.unit}</div>
             ${r.status ? `<div class="result-status" style="color: ${r.color}">${r.status}</div>` : ''}
+            <div class="result-samples">${r.samples} samples</div>
         </div>
     `).join('');
 
@@ -547,24 +598,34 @@ function handleMeasurement(data) {
 
     // Vitals
     updateVitals(data.vitals);
-    if (data.vitals) {
-        state.lastVitals = data.vitals;
+
+    // Accumulate ALL vitals for median computation at end
+    if (data.vitals && data.quality && data.quality.acceptable) {
+        state.totalMeasurements++;
+        state.goodMeasurements++;
+        const v = data.vitals;
+        if (v.heart_rate) state.allHR.push(v.heart_rate);
+        if (v.respiratory_rate) state.allRR.push(v.respiratory_rate);
+        if (v.blood_pressure_sys) state.allSys.push(v.blood_pressure_sys);
+        if (v.blood_pressure_dia) state.allDia.push(v.blood_pressure_dia);
+        if (v.spo2_estimate) state.allSpo2.push(v.spo2_estimate);
+        if (v.skin_temp) state.allTemp.push(v.skin_temp);
+        if (v.hrv_rmssd != null) state.allHRV.push(v.hrv_rmssd);
+        if (v.hrv_sdnn != null) state.allSDNN.push(v.hrv_sdnn);
+        if (v.hrv_pnn50 != null) state.allPNN50.push(v.hrv_pnn50);
+        if (v.stress_index != null) state.allStress.push(v.stress_index);
+        if (v.lf_hf_ratio != null) state.allLFHF.push(v.lf_hf_ratio);
+        if (v.perfusion_index != null) state.allPI.push(v.perfusion_index);
+        if (v.sympathetic_activity != null) state.allSympathetic.push(v.sympathetic_activity);
+        if (v.parasympathetic_activity != null) state.allParasympathetic.push(v.parasympathetic_activity);
+        if (v.prq != null) state.allPRQ.push(v.prq);
+        if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
+    } else if (data.vitals) {
+        state.totalMeasurements++;
     }
 
     // Quality
     updateQuality(data.quality);
-    if (data.quality) {
-        state.lastQuality = data.quality;
-        if (data.quality.acceptable) state.goodMeasurements++;
-    }
-
-    // Face rect for blur
-    if (data.face_rect) {
-        state.faceRect = data.face_rect;
-    } else {
-        state.faceRect = null;
-    }
-    renderBlurOverlay();
 
     // Charts
     if (data.raw_signal && data.raw_signal.length > 0) {
@@ -715,53 +776,6 @@ function updateHeartbeatSpeed(bpm) {
     });
 }
 
-// ─── Face Mask Overlay ───────────────────────────────────────────────
-function renderBlurOverlay() {
-    const bc = DOM.blurCanvas;
-    const video = DOM.videoFeed;
-    if (!bc || !video || !video.videoWidth) return;
-
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    bc.width = vw;
-    bc.height = vh;
-
-    const ctx = bc.getContext('2d');
-    ctx.clearRect(0, 0, vw, vh);
-
-    if (!state.faceRect) {
-        // No face detected — dim the entire view with a red tint
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(0, 0, vw, vh);
-        ctx.font = 'bold 16px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ef4444';
-        ctx.fillText('No Face Detected', vw / 2, vh / 2);
-        return;
-    }
-
-    let [fx, fy, fw, fh] = state.faceRect;
-    // Mirror face x coordinate (video is CSS scaleX(-1))
-    fx = vw - fx - fw;
-
-    // Face center and oval radii
-    const centerX = fx + fw / 2;
-    const centerY = fy + fh / 2;
-    const radiusX = fw * 0.6;
-    const radiusY = fh * 0.6;
-
-    // 1. Draw dark overlay over everything
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(0, 0, vw, vh);
-
-    // 2. Cut out the face oval (reveals clear face underneath)
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-}
 
 // ─── Signal Quality Display ──────────────────────────────────────────
 function updateQuality(quality) {

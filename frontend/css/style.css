@@ -1151,6 +1151,14 @@ body::before {
     line-height: 1.5;
 }
 
+.result-samples {
+    margin-top: 4px;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+}
+
 /* ─── HRV Detail Row ─────────────────────────────────────────────── */
 .hrv-detail-row {
     display: grid;
