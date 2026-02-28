@@ -85,6 +85,10 @@ const DOM = {
     btnStart: document.getElementById('btnStart'),
     btnStop: document.getElementById('btnStop'),
     btnReset: document.getElementById('btnReset'),
+    calibSys: document.getElementById('calibSys'),
+    calibDia: document.getElementById('calibDia'),
+    calibTemp: document.getElementById('calibTemp'),
+    calibSpo2: document.getElementById('calibSpo2'),
 
     videoFeed: document.getElementById('videoFeed'),
     canvas: document.getElementById('canvasHidden'),
@@ -271,6 +275,18 @@ function connectWebSocket() {
         DOM.sessionDot.classList.add('active');
         DOM.sessionLabel.textContent = `Session: ${state.sessionId}`;
         updateMessage('✅ Connected! Position your face and hold still.', 'success');
+
+        // Send calibration if values exist
+        const calib = {};
+        if (DOM.calibSys && DOM.calibSys.value) calib.baseline_sys = parseFloat(DOM.calibSys.value);
+        if (DOM.calibDia && DOM.calibDia.value) calib.baseline_dia = parseFloat(DOM.calibDia.value);
+        if (DOM.calibTemp && DOM.calibTemp.value) calib.baseline_temp = parseFloat(DOM.calibTemp.value);
+        if (DOM.calibSpo2 && DOM.calibSpo2.value) calib.baseline_spo2 = parseFloat(DOM.calibSpo2.value);
+
+        if (Object.keys(calib).length > 0) {
+            state.ws.send(JSON.stringify({ command: 'calibrate', data: calib }));
+        }
+
         startFrameCapture();
     };
 

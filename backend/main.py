@@ -309,6 +309,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     })
                     continue
 
+                if command == "calibrate":
+                    calib_data = message.get("data", {})
+                    if hasattr(engine, 'set_calibration'):
+                        engine.set_calibration(calib_data)
+                    await websocket.send_json({
+                        "type": "command_response",
+                        "command": "calibrate",
+                        "status": "ok"
+                    })
+                    continue
+
                 if command == "stats":
                     stats = engine.get_session_stats()
                     await websocket.send_json({

@@ -53,6 +53,13 @@ class SignalProcessor:
 
         # Rejection tracking
         self._consecutive_rejections = 0
+        
+        # Calibration baselines
+        self.calib_data = {}
+
+    def set_calibration(self, calib_data: Dict):
+        """Update calibration baseline values."""
+        self.calib_data.update(calib_data)
 
     def update_fps(self, new_fps: float):
         """Update FPS and re-design filters."""
@@ -291,19 +298,22 @@ class SignalProcessor:
     def estimate_bp(self, hr: float, pulse_amplitude: float) -> Tuple[float, float]:
         """
         Estimate Blood Pressure using Pulse Wave Analysis logic calibrator.
-        Strictly anchored to a healthy resting adult norm (~120/80) 
-        using Heart Rate deviation as the primary scaling factor.
+        Anchors to user-calibrated baseline (or healthy norm default)
+        and scales based on HR variance and pulse amplitude.
         """
-        # Baseline BP mapped precisely to normal physiologic parameters
-        # SBP = 118 base + (HR variance) + (Pulse Modulator)
-        sbp = 118.0 + ((hr - 72.0) * 0.35) + (pulse_amplitude * 2.0)
+        # Baseline BP
+        base_sys = self.calib_data.get('baseline_sys', 118.0)
+        base_dia = self.calib_data.get('baseline_dia', 78.0)
+
+        # SBP = base + (HR variance) + (Pulse Modulator)
+        sbp = base_sys + ((hr - 72.0) * 0.35) + (pulse_amplitude * 2.0)
         
-        # DBP = 78 base + (HR variance) - (Pulse Modulator)
-        dbp = 78.0 + ((hr - 72.0) * 0.15) - (pulse_amplitude * 1.0)
+        # DBP = base + (HR variance) - (Pulse Modulator)
+        dbp = base_dia + ((hr - 72.0) * 0.15) - (pulse_amplitude * 1.0)
         
-        # Clamp to realistic physiological ranges
-        sbp = max(100.0, min(160.0, sbp))
-        dbp = max(65.0, min(100.0, dbp))
+        # Clamp to realistic physiological ranges near baseline
+        sbp = max(base_sys - 30, min(base_sys + 45, sbp))
+        dbp = max(base_dia - 20, min(base_dia + 30, dbp))
         
         return round(sbp, 1), round(dbp, 1)
 
@@ -318,17 +328,16 @@ class SignalProcessor:
     def estimate_skin_temp(self, rgb_means: np.ndarray) -> float:
         """
         Estimate superficial skin temperature trend (in Fahrenheit).
-        Uses R/G ratio as a proxy for vasodilation/flushing.
+        Uses R/G ratio as a proxy for vasodilation/flushing, anchored to baseline.
         """
-        # Calibrated to exact average human forehead temp (97.4 F to 98.8 F)
+        base_temp = self.calib_data.get('baseline_temp', 97.6)
         r, g, b = rgb_means
-        if g == 0: return 98.2
+        if g == 0: return base_temp
         ratio = r / g
         
-        # ratio is typically 1.2 to 2.5
-        # Centralized temp with tight variance
-        temp_f = 97.6 + ((ratio - 1.2) * 0.8)
-        return round(max(97.2, min(99.2, temp_f)), 1)
+        # Centralized temp with tight variance around baseline
+        temp_f = base_temp + ((ratio - 1.2) * 0.8)
+        return round(max(base_temp - 1.0, min(base_temp + 2.0, temp_f)), 1)
 
     def compute_sqi(
         self,
@@ -444,9 +453,13 @@ class SignalProcessor:
 
             ratio = (red_ac / red_dc) / (blue_ac / blue_dc + 1e-10)
 
-            # Empirical linear model (needs calibration per camera)
-            spo2 = 110 - 25 * ratio
-            spo2 = max(70, min(100, spo2))
+            # Empirical model with baseline adjustment
+            base_spo2 = self.calib_data.get('baseline_spo2', 98.0)
+            
+            # Use ratio to calculate small deviations from the known baseline
+            deviation = (1.5 - ratio) * 10
+            spo2 = base_spo2 + deviation
+            spo2 = max(80, min(100, spo2))
             return round(spo2, 1)
         except Exception:
             return None

@@ -338,6 +338,11 @@ class RPPGEngine:
             "averaged_vitals": self.get_averaged_vitals(),
         }
 
+    def set_calibration(self, calib_data: Dict):
+        """Set user-specific calibration baselines."""
+        self.signal_processor.set_calibration(calib_data)
+        logger.info(f"Calibration updated: {calib_data}")
+
     def reset(self):
         """Full pipeline reset."""
         self._rgb_buffer.clear()
