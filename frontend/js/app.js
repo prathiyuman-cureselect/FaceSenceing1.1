@@ -638,9 +638,14 @@ function handleMeasurement(data) {
     updateVitals(data.vitals);
 
     // Accumulate ALL vitals for median computation at end (only during the 'vitals' phase)
-    if (state.scanPhase === 'vitals' && data.vitals && data.quality && data.quality.acceptable) {
+    // Removed strict 'quality.acceptable' filter here so we always collect data.
+    // The median function at the end handles noise and outliers perfectly.
+    if (state.scanPhase === 'vitals' && data.vitals) {
         state.totalMeasurements++;
-        state.goodMeasurements++;
+        if (data.quality && data.quality.acceptable) {
+            state.goodMeasurements++;
+        }
+
         const v = data.vitals;
         if (v.heart_rate) state.allHR.push(v.heart_rate);
         if (v.respiratory_rate) state.allRR.push(v.respiratory_rate);

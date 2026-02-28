@@ -256,8 +256,9 @@ class FaceDetector:
             if face_roi.size == 0 or w < 40 or h < 40:
                 return None
 
-            # Convert to grayscale for texture analysis
-            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+            # Convert to grayscale and apply Gaussian blur to remove raw webcam noise
+            # (Webcam noise causes massive spikes in Laplacian variance, falsely aging the user)
+            gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
             # 1. Wrinkle/texture score — Laplacian variance (higher = more detail/wrinkles)
             forehead_region = gray[0:h//4, w//4:3*w//4]
@@ -282,8 +283,8 @@ class FaceDetector:
             aspect_ratio = w / max(h, 1)
 
             # Estimate age from features
-            # Base age: start from 25
-            age = 25.0
+            # Base age: start from 24 (mid 20s baseline)
+            age = 24.0
 
             # Wrinkle contribution (more wrinkles = older)
             if laplacian_var > 800:
@@ -296,12 +297,12 @@ class FaceDetector:
                 age -= 8  # Very smooth = younger
 
             # Skin uniformity (less uniform = older)
-            if skin_std > 35:
-                age += 10
-            elif skin_std > 25:
+            if skin_std > 45:
+                age += 8
+            elif skin_std > 30:
                 age += 5
-            elif skin_std < 15:
-                age -= 5
+            elif skin_std < 18:
+                age -= 3
 
             # Eye texture
             if eye_texture > 500:
@@ -340,10 +341,11 @@ class FaceDetector:
             if face_roi.size == 0 or w < 40 or h < 40:
                 return None
 
-            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
             # Score: positive = male tendency, negative = female tendency
-            score = 0.0
+            # Base bias towards Male to counteract the skin-smoothing bias
+            score = 1.0
 
             # 1. Face aspect ratio: Males tend to have wider faces relative to height
             aspect = w / max(h, 1)
