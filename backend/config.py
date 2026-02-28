@@ -82,7 +82,7 @@ class QualityConfig:
 @dataclass
 class HRVConfig:
     """Heart Rate Variability settings."""
-    min_peaks_for_hrv: int = 6    # Minimum peaks for HRV computation
+    min_peaks_for_hrv: int = 3    # Minimum peaks for HRV computation
     rmssd_max: float = 300.0      # Maximum plausible RMSSD (ms)
     sdnn_max: float = 500.0       # Maximum plausible SDNN (ms)
 

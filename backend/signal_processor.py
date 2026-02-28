@@ -246,7 +246,7 @@ class SignalProcessor:
         # Filter physiologically implausible IBIs (40-200 bpm range)
         ibi = ibi[(ibi > 300) & (ibi < 1500)]
 
-        if len(ibi) < 5:
+        if len(ibi) < 2:
             return metrics
 
         # 1. Standard HRV
