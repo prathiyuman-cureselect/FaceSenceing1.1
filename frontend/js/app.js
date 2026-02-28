@@ -413,7 +413,7 @@ function startFrameCapture() {
         } else {
             // If in vitals phase, show progress. Otherwise show seconds.
             if (state.scanPhase === 'vitals') {
-                const progress = Math.min(100, (state.allHR.length / 20) * 100).toFixed(0);
+                const progress = Math.min(100, (state.allHR.length / 15) * 100).toFixed(0);
                 if (DOM.timerText) DOM.timerText.textContent = `💓 Fetching Vitals... ${progress}%`;
                 if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
             } else {
@@ -665,8 +665,8 @@ function handleMeasurement(data) {
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
 
-        // INSTANT COMPLETION -> Stop as soon as we have enough data
-        if (state.allHR.length >= 20 && state.isRunning) {
+        // INSTANT COMPLETION -> Stop as soon as we have enough stable data (just 15 frames)
+        if (state.allHR.length >= 15 && state.isRunning) {
             if (DOM.timerText) DOM.timerText.textContent = `✅ Status: DONE!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
@@ -676,7 +676,9 @@ function handleMeasurement(data) {
     }
 
     // Phase Switching updates for the UI
-    if (state.scanPhase === 'face' && state.allAge.length > 0 && data.buffer_fill > 90) {
+    // BUGFIX: Switch to vitals the absolute millisecond the backend starts sending actual vitals. 
+    // Don't wait for 90% buffer fill, which takes forever on low FPS cameras!
+    if (state.scanPhase === 'face' && data.vitals && data.vitals.heart_rate) {
         state.scanPhase = 'vitals';
         updateMessage('💓 Sensors locked! Extracting vitals from face...', 'info');
     }
