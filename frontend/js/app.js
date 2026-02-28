@@ -761,69 +761,6 @@ function renderBlurOverlay() {
     ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-
-    // 3. Draw glowing green oval border around face
-    ctx.save();
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
-    ctx.shadowBlur = 15;
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    // 4. Draw corner brackets around the face bounding box
-    const bx = fx - 10;
-    const by = fy - 10;
-    const bw = fw + 20;
-    const bh = fh + 20;
-    const bracketLen = 20;
-
-    ctx.save();
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-
-    // Top-left corner
-    ctx.beginPath();
-    ctx.moveTo(bx, by + bracketLen);
-    ctx.lineTo(bx, by);
-    ctx.lineTo(bx + bracketLen, by);
-    ctx.stroke();
-
-    // Top-right corner
-    ctx.beginPath();
-    ctx.moveTo(bx + bw - bracketLen, by);
-    ctx.lineTo(bx + bw, by);
-    ctx.lineTo(bx + bw, by + bracketLen);
-    ctx.stroke();
-
-    // Bottom-left corner
-    ctx.beginPath();
-    ctx.moveTo(bx, by + bh - bracketLen);
-    ctx.lineTo(bx, by + bh);
-    ctx.lineTo(bx + bracketLen, by + bh);
-    ctx.stroke();
-
-    // Bottom-right corner
-    ctx.beginPath();
-    ctx.moveTo(bx + bw - bracketLen, by + bh);
-    ctx.lineTo(bx + bw, by + bh);
-    ctx.lineTo(bx + bw, by + bh - bracketLen);
-    ctx.stroke();
-
-    ctx.restore();
-
-    // 5. Label: "Sensing Face"
-    ctx.save();
-    ctx.font = 'bold 13px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    ctx.shadowBlur = 4;
-    ctx.fillText('● Sensing Face', centerX, by - 8);
-    ctx.restore();
 }
 
 // ─── Signal Quality Display ──────────────────────────────────────────
