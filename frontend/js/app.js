@@ -390,7 +390,7 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 12; // Max fallback time EXACTLY 12 seconds
+    state.timeLeft = 20; // 20 seconds is a safer absolute max, otherwise old phones error out too early
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
@@ -700,9 +700,8 @@ function handleMeasurement(data) {
     }
 
     // Phase Switching updates for the UI
-    // BUGFIX: Switch to vitals the absolute millisecond the backend starts sending actual vitals. 
-    // Don't wait for 90% buffer fill, which takes forever on low FPS cameras!
-    if (state.scanPhase === 'face' && data.vitals && data.vitals.heart_rate) {
+    // Don't wait for 90% buffer fill! Transition visually the moment we have ANY vitals object.
+    if (state.scanPhase === 'face' && data.vitals && data.buffer_fill >= 10) {
         state.scanPhase = 'vitals';
         updateMessage('💓 Sensors locked! Extracting vitals from face...', 'info');
     }
