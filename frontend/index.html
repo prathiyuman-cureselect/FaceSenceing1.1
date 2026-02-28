@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis. Measures heart rate, respiratory rate, HRV, BP, SpO2 and more contactlessly.">
+        content="Clinical-grade remote photoplethysmography (rPPG) vital signs monitor using facial video analysis.">
     <meta name="theme-color" content="#0a0e1a">
     <title>TelegarudaAI — Clinical Dashboard</title>
-    <link rel="stylesheet" href="css/style.css?v=12">
+    <link rel="stylesheet" href="css/style.css?v=13">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫀</text></svg>">
 </head>
@@ -21,66 +21,47 @@
             <div class="startup-logo-container">
                 <img src="asserts/Images/logo.png" alt="TeleGaruda AI Logo" class="startup-logo">
             </div>
-            <h2>Welcome to TeleGaruda AI</h2>
+            <h2>TeleGaruda AI</h2>
+            <p class="startup-subtitle">Contactless Vital Sign Analysis</p>
             <p>
-                Clinical-grade contactless vital sign measurement using advanced facial video analysis.
-                Please ensure you are in a well-lit environment and remain still.
+                AI-powered facial video analysis to measure your vitals in 30 seconds.
+                Sit still, face the camera, and let the AI scan your face.
             </p>
             <div class="startup-features">
                 <span class="feature-chip">❤️ Heart Rate</span>
-                <span class="feature-chip">🌬️ Breathing Rate</span>
                 <span class="feature-chip">🩺 Blood Pressure</span>
                 <span class="feature-chip">🩸 SpO2</span>
                 <span class="feature-chip">🌡️ Temperature</span>
-                <span class="feature-chip">⚡ Sympathetic</span>
-                <span class="feature-chip">🧘 Parasympathetic</span>
-                <span class="feature-chip">💚 Wellness Score</span>
-            </div>
-
-            <div class="user-calibration"
-                style="margin: 20px 0; padding: 15px; border: 1px solid #334155; border-radius: 12px; background: rgba(15, 23, 42, 0.5);">
-                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 0.9rem; color: #94a3b8;">🎯 Baseline
-                    Calibration (Optional — improves BP/SpO2 accuracy)</h3>
-                <div
-                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; font-size: 0.85rem;">
-                    <label style="color: #cbd5e1;">SYS BP (mmHg)
-                        <input type="number" id="calibSys" placeholder="120"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-family: 'JetBrains Mono', monospace;">
-                    </label>
-                    <label style="color: #cbd5e1;">DIA BP (mmHg)
-                        <input type="number" id="calibDia" placeholder="80"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-family: 'JetBrains Mono', monospace;">
-                    </label>
-                    <label style="color: #cbd5e1;">Temp (°F)
-                        <input type="number" id="calibTemp" placeholder="98.6" step="0.1"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-family: 'JetBrains Mono', monospace;">
-                    </label>
-                    <label style="color: #cbd5e1;">SpO2 (%)
-                        <input type="number" id="calibSpo2" placeholder="98"
-                            style="width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-family: 'JetBrains Mono', monospace;">
-                    </label>
-                </div>
-            </div>
-
-            <div class="accuracy-guidelines"
-                style="margin: 16px 0; padding: 14px; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; background: rgba(16, 185, 129, 0.05); text-align: left; font-size: 0.8rem; color: #94a3b8;">
-                <h3 style="margin-top: 0; margin-bottom: 6px; font-size: 0.85rem; color: #34d399;">📋 Guidelines for
-                    Accuracy</h3>
-                <ul style="margin: 0; padding-left: 18px; line-height: 1.5;">
-                    <li><b style="color:#e2e8f0;">Lighting:</b> Evenly lit face. No shadows or backlighting.</li>
-                    <li><b style="color:#e2e8f0;">Movement:</b> Keep head <u>completely</u> still. No talking.</li>
-                    <li><b style="color:#e2e8f0;">Distance:</b> Arm's length from camera.</li>
-                    <li><b style="color:#e2e8f0;">Appearance:</b> No heavy makeup, thick glasses, or hair on forehead.
-                    </li>
-                </ul>
+                <span class="feature-chip">🧠 Stress</span>
+                <span class="feature-chip">💚 Wellness</span>
             </div>
 
             <button class="btn btn-primary btn-start-custom" id="btnStart">
-                Start Camera & Begin Analysis
+                🔬 Start Scan (30 seconds)
             </button>
             <p class="startup-disclaimer">
-                🔒 Camera only. Video never leaves your device. Not for clinical diagnosis.
+                🔒 Camera only · Video never leaves your device · Not for clinical diagnosis
             </p>
+        </div>
+    </div>
+
+    <!-- ═══ Results Overlay ═══ -->
+    <div class="results-overlay" id="resultsOverlay">
+        <div class="results-content">
+            <div class="results-header">
+                <h2>📋 Your Vital Signs Report</h2>
+                <p class="results-subtitle">Scan completed · Results below</p>
+            </div>
+            <div class="results-grid" id="resultsGrid">
+                <!-- Populated by JS -->
+            </div>
+            <div class="results-footer">
+                <p class="results-disclaimer">⚠️ These are AI estimations from facial video analysis. Not for clinical
+                    diagnosis. Always consult a healthcare professional.</p>
+                <button class="btn btn-primary btn-start-custom" id="btnScanAgain">
+                    🔬 Scan Again
+                </button>
+            </div>
         </div>
     </div>
 
@@ -108,7 +89,7 @@
         <!-- Message Bar -->
         <div class="message-bar" id="messageBar">
             <span class="icon">ℹ️</span>
-            <span id="messageText">Click "Start Camera" to begin vital sign analysis.</span>
+            <span id="messageText">Click "Start Scan" to begin vital sign analysis.</span>
         </div>
 
         <!-- ─── Video Feed ─── -->
@@ -147,24 +128,18 @@
 
         <!-- ─── Vital Signs Grid ─── -->
         <section class="vitals-grid" id="vitalsGrid">
-
-            <!-- Heart Rate -->
             <div class="vital-card hr" id="cardHR">
                 <span class="vital-label"><span class="icon">❤️</span> Heart Rate</span>
                 <div class="vital-value inactive" id="hrValue">--</div>
                 <span class="vital-unit">BPM</span>
                 <div class="vital-sparkline"><canvas id="sparklineHR" width="200" height="36"></canvas></div>
             </div>
-
-            <!-- Respiratory Rate -->
             <div class="vital-card rr" id="cardRR">
                 <span class="vital-label"><span class="icon">🌬️</span> Breathing Rate</span>
                 <div class="vital-value inactive" id="rrValue">--</div>
                 <span class="vital-unit">br/min</span>
                 <div class="vital-sparkline"><canvas id="sparklineRR" width="200" height="36"></canvas></div>
             </div>
-
-            <!-- Blood Pressure -->
             <div class="vital-card bp" id="cardBP">
                 <span class="vital-label"><span class="icon">🩺</span> Blood Pressure</span>
                 <div class="vital-value inactive" id="bpValue">--</div>
@@ -180,15 +155,11 @@
                     </div>
                 </div>
             </div>
-
-            <!-- SpO2 -->
             <div class="vital-card spo2" id="cardSpO2">
                 <span class="vital-label"><span class="icon">🩸</span> SpO2</span>
                 <div class="vital-value inactive" id="spo2Value">--</div>
                 <span class="vital-unit">%</span>
             </div>
-
-            <!-- HRV -->
             <div class="vital-card hrv" id="cardHRV">
                 <span class="vital-label"><span class="icon">📊</span> HRV (RMSSD)</span>
                 <div class="vital-value inactive" id="hrvValue">--</div>
@@ -204,8 +175,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Body Temperature -->
             <div class="vital-card temp" id="cardTemp">
                 <span class="vital-label"><span class="icon">🌡️</span> Body Temperature</span>
                 <div class="vital-value inactive" id="tempValue">--</div>
@@ -217,8 +186,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Stress & ANS -->
             <div class="vital-card stress" id="cardStress">
                 <span class="vital-label"><span class="icon">🧠</span> Stress & ANS</span>
                 <div class="vital-value inactive" id="stressValue">--</div>
@@ -234,90 +201,25 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Sympathetic -->
             <div class="vital-card sympathetic" id="cardSympathetic">
                 <span class="vital-label"><span class="icon">⚡</span> Sympathetic</span>
                 <div class="vital-value inactive" id="sympatheticValue">--</div>
                 <span class="vital-unit">% Activity</span>
             </div>
-
-            <!-- Parasympathetic -->
             <div class="vital-card parasympathetic" id="cardParasympathetic">
                 <span class="vital-label"><span class="icon">🧘</span> Parasympathetic</span>
                 <div class="vital-value inactive" id="parasympatheticValue">--</div>
                 <span class="vital-unit">% Activity</span>
             </div>
-
-            <!-- PRQ -->
             <div class="vital-card prq" id="cardPRQ">
                 <span class="vital-label"><span class="icon">🔄</span> PRQ</span>
                 <div class="vital-value inactive" id="prqValue">--</div>
                 <span class="vital-unit">Recovery Quotient</span>
             </div>
-
-            <!-- Wellness Score -->
             <div class="vital-card wellness" id="cardWellness">
                 <span class="vital-label"><span class="icon">💚</span> Wellness Score</span>
                 <div class="vital-value inactive" id="wellnessValue">--</div>
                 <span class="vital-unit">/ 10</span>
-            </div>
-        </section>
-
-        <!-- ─── Validation Panel ─── -->
-        <section class="card validation-section" id="validationSection">
-            <div class="card-header" style="cursor:pointer;"
-                onclick="document.getElementById('validationBody').classList.toggle('collapsed')">
-                <span class="card-title"><span class="icon">✅</span> Accuracy Validation — Compare with Device</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">▼ click to expand</span>
-            </div>
-            <div id="validationBody" class="collapsed">
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
-                    Enter your actual device-measured values below. Click "Compare" to see the accuracy of each camera
-                    reading.
-                </p>
-                <div class="validation-grid">
-                    <div class="validation-row">
-                        <label>Heart Rate (BPM)</label>
-                        <input type="number" id="valHR" placeholder="e.g. 72">
-                        <span class="val-camera" id="valCamHR">--</span>
-                        <span class="val-accuracy" id="valAccHR">--%</span>
-                    </div>
-                    <div class="validation-row">
-                        <label>SYS BP (mmHg)</label>
-                        <input type="number" id="valSys" placeholder="e.g. 120">
-                        <span class="val-camera" id="valCamSys">--</span>
-                        <span class="val-accuracy" id="valAccSys">--%</span>
-                    </div>
-                    <div class="validation-row">
-                        <label>DIA BP (mmHg)</label>
-                        <input type="number" id="valDia" placeholder="e.g. 80">
-                        <span class="val-camera" id="valCamDia">--</span>
-                        <span class="val-accuracy" id="valAccDia">--%</span>
-                    </div>
-                    <div class="validation-row">
-                        <label>SpO2 (%)</label>
-                        <input type="number" id="valSpo2" placeholder="e.g. 98">
-                        <span class="val-camera" id="valCamSpo2">--</span>
-                        <span class="val-accuracy" id="valAccSpo2">--%</span>
-                    </div>
-                    <div class="validation-row">
-                        <label>Temp (°F)</label>
-                        <input type="number" id="valTemp" placeholder="e.g. 98.6" step="0.1">
-                        <span class="val-camera" id="valCamTemp">--</span>
-                        <span class="val-accuracy" id="valAccTemp">--%</span>
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="btnValidate" style="width:100%; margin-top:12px;"
-                    onclick="runValidation()">
-                    🔍 Compare & Show Accuracy
-                </button>
-                <div id="validationResult" style="margin-top:12px; text-align:center; display:none;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom:4px;">OVERALL ACCURACY</div>
-                    <div id="overallAccuracy"
-                        style="font-size: 2rem; font-weight: 800; color: #34d399; font-family: 'JetBrains Mono', monospace;">
-                        --%</div>
-                </div>
             </div>
         </section>
 
@@ -330,7 +232,6 @@
                 </span>
             </div>
             <div class="quality-meters">
-                <!-- SNR -->
                 <div class="quality-meter">
                     <div class="quality-meter-label">SNR</div>
                     <div class="quality-ring" id="ringSnr">
@@ -343,7 +244,6 @@
                     </div>
                     <div style="font-size:0.65rem; color: var(--text-dim);">dB</div>
                 </div>
-                <!-- Spectral Purity -->
                 <div class="quality-meter">
                     <div class="quality-meter-label">Spectral</div>
                     <div class="quality-ring" id="ringSpectral">
@@ -357,7 +257,6 @@
                     </div>
                     <div style="font-size:0.65rem; color: var(--text-dim);">purity</div>
                 </div>
-                <!-- Motion -->
                 <div class="quality-meter">
                     <div class="quality-meter-label">Motion</div>
                     <div class="quality-ring" id="ringMotion">
@@ -370,7 +269,6 @@
                     </div>
                     <div style="font-size:0.65rem; color: var(--text-dim);">score</div>
                 </div>
-                <!-- Face Confidence -->
                 <div class="quality-meter">
                     <div class="quality-meter-label">Face</div>
                     <div class="quality-ring" id="ringFace">
@@ -389,79 +287,28 @@
         <!-- ─── Charts ─── -->
         <div class="charts-section">
             <div class="chart-container card">
-                <div class="card-header">
-                    <span class="card-title"><span class="icon">〰️</span> rPPG Pulse Signal</span>
+                <div class="card-header"><span class="card-title"><span class="icon">〰️</span> rPPG Pulse Signal</span>
                 </div>
-                <div class="chart-canvas-wrapper">
-                    <canvas id="chartSignal"></canvas>
-                </div>
+                <div class="chart-canvas-wrapper"><canvas id="chartSignal"></canvas></div>
             </div>
             <div class="chart-container card">
-                <div class="card-header">
-                    <span class="card-title"><span class="icon">📈</span> Power Spectrum (FFT)</span>
-                </div>
-                <div class="chart-canvas-wrapper">
-                    <canvas id="chartSpectrum"></canvas>
-                </div>
+                <div class="card-header"><span class="card-title"><span class="icon">📈</span> Power Spectrum
+                        (FFT)</span></div>
+                <div class="chart-canvas-wrapper"><canvas id="chartSpectrum"></canvas></div>
             </div>
         </div>
     </main>
 
-    <!-- ═══ Session Summary Modal ═══ -->
+    <!-- ═══ Session Summary Modal (legacy) ═══ -->
     <div class="modal-backdrop" id="summaryModal">
         <div class="modal">
             <h3>📋 Session Summary</h3>
-            <div class="summary-grid" id="summaryGrid">
-                <!-- Populated dynamically -->
-            </div>
+            <div class="summary-grid" id="summaryGrid"></div>
             <button class="btn btn-primary" id="btnCloseSummary" style="width:100%;">Close</button>
         </div>
     </div>
 
-    <script src="js/app.js?v=12"></script>
-    <script>
-        // ─── Validation Logic ────────────────────────────────
-        function runValidation() {
-            const fields = [
-                { input: 'valHR', cam: 'valCamHR', acc: 'valAccHR', vitalId: 'hrValue' },
-                { input: 'valSys', cam: 'valCamSys', acc: 'valAccSys', vitalId: 'sysValue' },
-                { input: 'valDia', cam: 'valCamDia', acc: 'valAccDia', vitalId: 'diaValue' },
-                { input: 'valSpo2', cam: 'valCamSpo2', acc: 'valAccSpo2', vitalId: 'spo2Value' },
-                { input: 'valTemp', cam: 'valCamTemp', acc: 'valAccTemp', vitalId: 'tempValue' },
-            ];
-
-            let totalAcc = 0;
-            let count = 0;
-
-            fields.forEach(f => {
-                const actual = parseFloat(document.getElementById(f.input).value);
-                const camEl = document.getElementById(f.vitalId);
-                const camera = camEl ? parseFloat(camEl.textContent) : NaN;
-
-                document.getElementById(f.cam).textContent = isNaN(camera) ? '--' : camera.toFixed(1);
-
-                if (!isNaN(actual) && !isNaN(camera) && actual > 0) {
-                    const accuracy = Math.max(0, (1 - Math.abs(camera - actual) / actual) * 100);
-                    document.getElementById(f.acc).textContent = accuracy.toFixed(1) + '%';
-                    document.getElementById(f.acc).style.color = accuracy >= 90 ? '#34d399' : (accuracy >= 75 ? '#fbbf24' : '#ef4444');
-                    totalAcc += accuracy;
-                    count++;
-                } else {
-                    document.getElementById(f.acc).textContent = '--%';
-                    document.getElementById(f.acc).style.color = '#64748b';
-                }
-            });
-
-            const resultDiv = document.getElementById('validationResult');
-            const overallEl = document.getElementById('overallAccuracy');
-            if (count > 0) {
-                const overall = totalAcc / count;
-                overallEl.textContent = overall.toFixed(1) + '%';
-                overallEl.style.color = overall >= 90 ? '#34d399' : (overall >= 75 ? '#fbbf24' : '#ef4444');
-                resultDiv.style.display = 'block';
-            }
-        }
-    </script>
+    <script src="js/app.js?v=13"></script>
 </body>
 
 </html>

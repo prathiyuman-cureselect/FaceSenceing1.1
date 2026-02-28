@@ -80,18 +80,22 @@ const state = {
 
     // Face rect for blur
     faceRect: null,
+
+    // Last received vitals (for results screen)
+    lastVitals: null,
+    lastQuality: null,
+    goodMeasurements: 0,
 };
 
 // ─── DOM References ───────────────────────────────────────────────────
 const DOM = {
     startupOverlay: document.getElementById('startupOverlay'),
+    resultsOverlay: document.getElementById('resultsOverlay'),
+    resultsGrid: document.getElementById('resultsGrid'),
     btnStart: document.getElementById('btnStart'),
     btnStop: document.getElementById('btnStop'),
     btnReset: document.getElementById('btnReset'),
-    calibSys: document.getElementById('calibSys'),
-    calibDia: document.getElementById('calibDia'),
-    calibTemp: document.getElementById('calibTemp'),
-    calibSpo2: document.getElementById('calibSpo2'),
+    btnScanAgain: document.getElementById('btnScanAgain'),
 
     videoFeed: document.getElementById('videoFeed'),
     canvas: document.getElementById('canvasHidden'),
@@ -163,6 +167,13 @@ function setupEventListeners() {
     DOM.btnCloseSummary.addEventListener('click', () => {
         DOM.summaryModal.classList.remove('visible');
     });
+    if (DOM.btnScanAgain) {
+        DOM.btnScanAgain.addEventListener('click', () => {
+            DOM.resultsOverlay.classList.remove('visible');
+            DOM.startupOverlay.classList.remove('hidden');
+            DOM.btnStart.disabled = false;
+        });
+    }
 }
 
 function resizeChartCanvases() {
@@ -365,7 +376,8 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 35; // 35 seconds to allow 2-3s buffer + 30s scan
+    state.timeLeft = 30;
+    state.goodMeasurements = 0;
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
     if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
     if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
@@ -375,9 +387,9 @@ function startFrameCapture() {
         if (state.timeLeft <= 0) {
             clearInterval(state.scanTimerInterval);
             if (DOM.timerText) DOM.timerText.textContent = `⏱️ Done!`;
-            if (DOM.timerChip) DOM.timerChip.style.background = '#059669'; // Green success
-            // Optional: Auto stop session when timer completes
-            // stopSession(); 
+            if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
+            // Auto-stop and show results
+            autoCompleteSession();
         } else {
             if (DOM.timerText) DOM.timerText.textContent = `⏱️ ${state.timeLeft}s left`;
         }
@@ -417,23 +429,7 @@ async function startSession() {
 
 async function stopSession() {
     state.isRunning = false;
-
     stopFrameCapture();
-
-    // Fetch summary before disconnecting
-    if (state.sessionId) {
-        try {
-            const summaryUrl = `${window.location.protocol}//${HOSTNAME}${PORT}/api/session/${state.sessionId}/summary`;
-            const res = await fetch(summaryUrl);
-            if (res.ok) {
-                const summary = await res.json();
-                showSummaryModal(summary);
-            }
-        } catch (err) {
-            console.warn('Could not fetch summary:', err);
-        }
-    }
-
     disconnectWebSocket();
     stopCamera();
     resetUI();
@@ -441,6 +437,68 @@ async function stopSession() {
     DOM.startupOverlay.classList.remove('hidden');
     DOM.btnStart.disabled = false;
     updateMessage('Session ended.', 'info');
+}
+
+async function autoCompleteSession() {
+    state.isRunning = false;
+    stopFrameCapture();
+    disconnectWebSocket();
+    stopCamera();
+
+    // Show results screen with final vitals
+    showResultsScreen();
+    updateMessage('✅ Scan complete! Your results are ready.', 'success');
+}
+
+function showResultsScreen() {
+    const v = state.lastVitals;
+    if (!v) {
+        alert('No data was captured. Please try again with good lighting and stay still.');
+        DOM.startupOverlay.classList.remove('hidden');
+        DOM.btnStart.disabled = false;
+        return;
+    }
+
+    function fmt(val, decimals = 0) {
+        return (val !== null && val !== undefined) ? Number(val).toFixed(decimals) : '--';
+    }
+    function statusColor(val, low, high) {
+        if (val === null || val === undefined) return '#64748b';
+        if (val >= low && val <= high) return '#10b981'; // green
+        return '#ef4444'; // red
+    }
+    function statusLabel(val, low, high) {
+        if (val === null || val === undefined) return 'N/A';
+        if (val >= low && val <= high) return 'Normal';
+        if (val < low) return 'Low';
+        return 'High';
+    }
+
+    const results = [
+        { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM', color: statusColor(v.heart_rate, 60, 100), status: statusLabel(v.heart_rate, 60, 100) },
+        { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min', color: statusColor(v.respiratory_rate, 12, 20), status: statusLabel(v.respiratory_rate, 12, 20) },
+        { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg', color: statusColor(v.blood_pressure_sys, 90, 140), status: statusLabel(v.blood_pressure_sys, 90, 140) },
+        { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%', color: statusColor(v.spo2_estimate, 95, 100), status: statusLabel(v.spo2_estimate, 95, 100) },
+        { icon: '🌡️', label: 'Temperature', value: fmt(v.skin_temp, 1), unit: '°F', color: statusColor(v.skin_temp, 97.0, 99.5), status: statusLabel(v.skin_temp, 97.0, 99.5) },
+        { icon: '📊', label: 'HRV (RMSSD)', value: fmt(v.hrv_rmssd), unit: 'ms', color: statusColor(v.hrv_rmssd, 20, 200), status: statusLabel(v.hrv_rmssd, 20, 200) },
+        { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI', color: statusColor(v.stress_index, 0, 500), status: v.stress_index > 500 ? 'High Stress' : (v.stress_index > 150 ? 'Moderate' : 'Relaxed') },
+        { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%', color: '#f87171', status: '' },
+        { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%', color: '#60a5fa', status: '' },
+        { icon: '🔄', label: 'PRQ', value: fmt(v.prq, 1), unit: '', color: '#a78bfa', status: '' },
+        { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10', color: v.wellness_score >= 7 ? '#34d399' : (v.wellness_score >= 4 ? '#fbbf24' : '#ef4444'), status: v.wellness_score >= 7 ? 'Good' : (v.wellness_score >= 4 ? 'Fair' : 'Poor') },
+    ];
+
+    DOM.resultsGrid.innerHTML = results.map(r => `
+        <div class="result-card">
+            <div class="result-icon">${r.icon}</div>
+            <div class="result-label">${r.label}</div>
+            <div class="result-value" style="color: ${r.color}">${r.value}</div>
+            <div class="result-unit">${r.unit}</div>
+            ${r.status ? `<div class="result-status" style="color: ${r.color}">${r.status}</div>` : ''}
+        </div>
+    `).join('');
+
+    DOM.resultsOverlay.classList.add('visible');
 }
 
 function resetSession() {
@@ -489,9 +547,16 @@ function handleMeasurement(data) {
 
     // Vitals
     updateVitals(data.vitals);
+    if (data.vitals) {
+        state.lastVitals = data.vitals;
+    }
 
     // Quality
     updateQuality(data.quality);
+    if (data.quality) {
+        state.lastQuality = data.quality;
+        if (data.quality.acceptable) state.goodMeasurements++;
+    }
 
     // Face rect for blur
     if (data.face_rect) {
