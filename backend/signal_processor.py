@@ -317,45 +317,43 @@ class SignalProcessor:
         base_dia = self.calib_data.get('baseline_dia', 80.0)
 
         # ── Factor 1: Heart Rate deviation ──
-        # Resting HR ~72 BPM. Higher HR → sympathetic activation → higher BP
-        hr_dev = hr - 72.0
-        hr_sys_contrib = hr_dev * 0.3
-        hr_dia_contrib = hr_dev * 0.15
+        # Resting baseline. Higher HR strongly correlates with elevated BP. 
+        # Multipliers drastically increased to allow BP to fluctuate naturally.
+        hr_dev = hr - 70.0
+        hr_sys_contrib = hr_dev * 1.2
+        hr_dia_contrib = hr_dev * 0.6
 
         # ── Factor 2: Pulse Amplitude (AC component) ──
-        # Larger AC amplitude → stronger pulse wave → higher pulse pressure
-        amp_sys_contrib = pulse_amplitude * 2.5
-        amp_dia_contrib = pulse_amplitude * 1.0
+        # Hypertensive flow creates distinctly harder pulsatile peaks on the face
+        amp_sys_contrib = pulse_amplitude * 15.0
+        amp_dia_contrib = pulse_amplitude * 5.0
 
-        # ── Factor 3: Pulse Wave Variability (beat-to-beat) ──
+        # ── Factor 3: Pulse Wave Variability (beat-to-beat stiffness) ──
         pwv_contrib_sys = 0.0
         pwv_contrib_dia = 0.0
         if hr_filtered is not None and len(hr_filtered) > 60:
-            # Find peaks in the filtered signal
             peaks = []
             for i in range(1, len(hr_filtered) - 1):
                 if hr_filtered[i] > hr_filtered[i-1] and hr_filtered[i] > hr_filtered[i+1]:
                     if hr_filtered[i] > 0.3 * np.max(hr_filtered):
                         peaks.append(hr_filtered[i])
             if len(peaks) > 3:
-                # Higher peak-to-peak variability → arterial stiffness → higher BP
                 peak_std = np.std(peaks)
                 peak_mean = np.mean(peaks)
                 if peak_mean > 0:
                     variability = peak_std / peak_mean
-                    pwv_contrib_sys = variability * 15.0
-                    pwv_contrib_dia = variability * 8.0
+                    pwv_contrib_sys = variability * 40.0
+                    pwv_contrib_dia = variability * 20.0
 
         # ── Factor 4: Signal Energy ──
         energy_contrib_sys = 0.0
         energy_contrib_dia = 0.0
         if hr_filtered is not None and len(hr_filtered) > 30:
             signal_energy = np.sum(hr_filtered ** 2) / len(hr_filtered)
-            # Higher energy → more forceful cardiac output
-            energy_contrib_sys = min(signal_energy * 5.0, 15.0)
-            energy_contrib_dia = min(signal_energy * 2.5, 8.0)
+            energy_contrib_sys = min(signal_energy * 25.0, 30.0)
+            energy_contrib_dia = min(signal_energy * 10.0, 15.0)
 
-        # ── Factor 5: Red Channel Intensity (vasodilation proxy) ──
+        # ── Factor 5: Red Channel Intensity (vasodilation/flushing proxy) ──
         red_contrib_sys = 0.0
         red_contrib_dia = 0.0
         if rgb_array is not None and len(rgb_array) > 10:
@@ -363,9 +361,10 @@ class SignalProcessor:
             green_mean = np.mean(rgb_array[:, 1])
             if green_mean > 0:
                 rg_ratio = red_mean / green_mean
-                # Higher R/G ratio → more facial flushing → correlates with higher BP
-                red_contrib_sys = max(0, (rg_ratio - 1.0) * 8.0)
-                red_contrib_dia = max(0, (rg_ratio - 1.0) * 4.0)
+                # High R/G strongly indicates facial flushing typical of high BP
+                if rg_ratio > 1.05:
+                    red_contrib_sys = (rg_ratio - 1.05) * 60.0
+                    red_contrib_dia = (rg_ratio - 1.05) * 35.0
 
         # ── Combine all factors ──
         sbp = (
