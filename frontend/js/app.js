@@ -390,35 +390,28 @@ function startFrameCapture() {
     }, CONFIG.FRAME_INTERVAL_MS);
 
     // Start UI Scan Timer
-    state.timeLeft = 35;
+    state.timeLeft = 40; // Fallback maximum time
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
     ['allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV', 'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI', 'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness', 'allAge', 'allGender'].forEach(k => state[k] = []);
     if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
     if (DOM.timerChip) DOM.timerChip.style.background = '#7c3aed'; // Purple for face scan phase
-    if (DOM.timerText) DOM.timerText.textContent = `👤 Scanning Face...`;
+    if (DOM.timerText) DOM.timerText.textContent = `👤 Detecting Face...`;
     state.scanPhase = 'face';
-    updateMessage('📸 Phase 1: Scanning your face for age & gender...', 'info');
 
     state.scanTimerInterval = setInterval(() => {
         state.timeLeft--;
 
         if (state.timeLeft <= 0) {
             clearInterval(state.scanTimerInterval);
-            if (DOM.timerText) DOM.timerText.textContent = `✅ Done!`;
-            if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
-        } else if (state.timeLeft <= 30 && state.scanPhase === 'face') {
-            // Switch to vitals phase after 5 seconds
-            state.scanPhase = 'vitals';
-            if (DOM.timerChip) DOM.timerChip.style.background = '#0f172a';
-            if (DOM.timerText) DOM.timerText.textContent = `💓 ${state.timeLeft}s · Sensing Vitals...`;
-            updateMessage('💓 Phase 2: Sensing your vital signs — hold still!', 'info');
+        } else if (state.scanPhase === 'face') {
+            if (DOM.timerText) DOM.timerText.textContent = `👤 Analyzing Face... ${state.timeLeft}s`;
         } else if (state.scanPhase === 'vitals') {
-            if (DOM.timerText) DOM.timerText.textContent = `💓 ${state.timeLeft}s · Sensing Vitals...`;
-        } else {
-            if (DOM.timerText) DOM.timerText.textContent = `👤 Scanning Face... ${state.timeLeft}s`;
+            const progress = Math.min(100, (state.allHR.length / 25) * 100).toFixed(0);
+            if (DOM.timerText) DOM.timerText.textContent = `💓 Sensing... ${progress}%`;
+            if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
         }
     }, 1000);
 }
@@ -477,14 +470,15 @@ async function autoCompleteSession() {
     updateMessage('✅ Scan complete! Your results are ready.', 'success');
 }
 
+// Helper: Compute median of an array
+function median(arr) {
+    if (!arr || arr.length === 0) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 function showResultsScreen() {
-    // Compute median of all accumulated measurements
-    function median(arr) {
-        if (!arr || arr.length === 0) return null;
-        const sorted = [...arr].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-    }
 
     const v = {
         heart_rate: median(state.allHR),
@@ -663,8 +657,21 @@ function handleMeasurement(data) {
         if (v.parasympathetic_activity != null) state.allParasympathetic.push(v.parasympathetic_activity);
         if (v.prq != null) state.allPRQ.push(v.prq);
         if (v.wellness_score != null) state.allWellness.push(v.wellness_score);
+
+        // Instant completion: 25 stable readings takes ~1-3 seconds after buffer fills
+        if (state.allHR.length >= 25 && state.isRunning) {
+            if (DOM.timerText) DOM.timerText.textContent = `✅ Done!`;
+            if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
+            autoCompleteSession();
+        }
     } else if (data.vitals) {
         state.totalMeasurements++;
+    }
+
+    // Dynamic Phase Switching: Switch from 'face' to 'vitals' once backend sends vitals OR buffer fills
+    if (state.scanPhase === 'face' && state.allAge.length > 0 && data.buffer_fill > 90) {
+        state.scanPhase = 'vitals';
+        updateMessage('💓 Sensors active! Hold still for instant results...', 'info');
     }
 
     // Age & Gender estimation — accumulate regardless of quality
@@ -675,7 +682,9 @@ function handleMeasurement(data) {
         state.allGender.push(data.estimated_gender);
     }
     // Show face info on video
-    showFaceInfoOnVideo(data.estimated_age, data.estimated_gender);
+    if (state.scanPhase === 'face' || state.allAge.length > 0) {
+        showFaceInfoOnVideo(data.estimated_age || median(state.allAge), data.estimated_gender || state.allGender[state.allGender.length - 1]);
+    }
 
     // Quality
     updateQuality(data.quality);
