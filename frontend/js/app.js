@@ -650,7 +650,7 @@ function updateHeartbeatSpeed(bpm) {
     });
 }
 
-// ─── Background Blur Overlay ─────────────────────────────────────────
+// ─── Face Mask Overlay ───────────────────────────────────────────────
 function renderBlurOverlay() {
     const bc = DOM.blurCanvas;
     const video = DOM.videoFeed;
@@ -662,68 +662,102 @@ function renderBlurOverlay() {
     bc.height = vh;
 
     const ctx = bc.getContext('2d');
+    ctx.clearRect(0, 0, vw, vh);
 
     if (!state.faceRect) {
-        // No face — clear overlay
-        ctx.clearRect(0, 0, vw, vh);
+        // No face detected — dim the entire view with a red tint
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(0, 0, vw, vh);
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText('No Face Detected', vw / 2, vh / 2);
         return;
     }
 
-    // Draw the full video frame blurred
-    ctx.save();
-    ctx.filter = 'blur(12px)';
-    // Mirror horizontally to match the CSS scaleX(-1) on the video
-    ctx.translate(vw, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh);
-    ctx.restore();
-
-    // Cut out the face region (show it clear/focused)
     let [fx, fy, fw, fh] = state.faceRect;
-    // Mirror face x coordinate
+    // Mirror face x coordinate (video is CSS scaleX(-1))
     fx = vw - fx - fw;
-    // Add small padding around the face
-    const pad = Math.round(fw * 0.15);
-    const cx = Math.max(0, fx - pad);
-    const cy = Math.max(0, fy - pad);
-    const cw = Math.min(vw - cx, fw + pad * 2);
-    const ch = Math.min(vh - cy, fh + pad * 2);
 
-    // Clear the face area from the blurred layer (reveals the sharp video underneath)
+    // Face center and oval radii
+    const centerX = fx + fw / 2;
+    const centerY = fy + fh / 2;
+    const radiusX = fw * 0.6;
+    const radiusY = fh * 0.6;
+
+    // 1. Draw dark overlay over everything
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, vw, vh);
+
+    // 2. Cut out the face oval (reveals clear face underneath)
     ctx.save();
-    ctx.beginPath();
-    // Draw rounded rectangle for the face cutout
-    const radius = Math.min(cw, ch) * 0.3;
-    ctx.moveTo(cx + radius, cy);
-    ctx.lineTo(cx + cw - radius, cy);
-    ctx.quadraticCurveTo(cx + cw, cy, cx + cw, cy + radius);
-    ctx.lineTo(cx + cw, cy + ch - radius);
-    ctx.quadraticCurveTo(cx + cw, cy + ch, cx + cw - radius, cy + ch);
-    ctx.lineTo(cx + radius, cy + ch);
-    ctx.quadraticCurveTo(cx, cy + ch, cx, cy + ch - radius);
-    ctx.lineTo(cx, cy + radius);
-    ctx.quadraticCurveTo(cx, cy, cx + radius, cy);
-    ctx.closePath();
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // Draw a subtle green border around the face cutout
+    // 3. Draw glowing green oval border around face
     ctx.save();
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
+    ctx.shadowBlur = 15;
     ctx.beginPath();
-    ctx.moveTo(cx + radius, cy);
-    ctx.lineTo(cx + cw - radius, cy);
-    ctx.quadraticCurveTo(cx + cw, cy, cx + cw, cy + radius);
-    ctx.lineTo(cx + cw, cy + ch - radius);
-    ctx.quadraticCurveTo(cx + cw, cy + ch, cx + cw - radius, cy + ch);
-    ctx.lineTo(cx + radius, cy + ch);
-    ctx.quadraticCurveTo(cx, cy + ch, cx, cy + ch - radius);
-    ctx.lineTo(cx, cy + radius);
-    ctx.quadraticCurveTo(cx, cy, cx + radius, cy);
-    ctx.closePath();
+    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+
+    // 4. Draw corner brackets around the face bounding box
+    const bx = fx - 10;
+    const by = fy - 10;
+    const bw = fw + 20;
+    const bh = fh + 20;
+    const bracketLen = 20;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(bx, by + bracketLen);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(bx + bracketLen, by);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(bx + bw - bracketLen, by);
+    ctx.lineTo(bx + bw, by);
+    ctx.lineTo(bx + bw, by + bracketLen);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(bx, by + bh - bracketLen);
+    ctx.lineTo(bx, by + bh);
+    ctx.lineTo(bx + bracketLen, by + bh);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(bx + bw - bracketLen, by + bh);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.lineTo(bx + bw, by + bh - bracketLen);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // 5. Label: "Sensing Face"
+    ctx.save();
+    ctx.font = 'bold 13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 4;
+    ctx.fillText('● Sensing Face', centerX, by - 8);
     ctx.restore();
 }
 
