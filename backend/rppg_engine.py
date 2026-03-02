@@ -146,7 +146,7 @@ class RPPGEngine:
                     self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
                 else:
                     self._stable_sentiment = "Neutral"
-                result.message = "Face Analyzed. Starting Vitals Sensing..."
+                result.message = "PHASE_DETECTION_COMPLETE"
                 self._face_lost_counter = 0 # Reset lost counter on valid scan phase
         
         self._frames_processed += 1 # Total frames processed (including no face)
@@ -157,9 +157,9 @@ class RPPGEngine:
 
         # Step 2: Motion Robustness
         self._estimate_motion(frame)
-        if self._motion_score > 15.0:
-            result.message = "Too much movement. Please stay still."
-            return result
+        if self._motion_score > 35.0:
+            result.message = "✨ Stabilizing (Minor Motion Detected)..."
+            # No early return here - keep processing!
 
         # Step 3: High-Fidelity Signal Extraction (Multi-Patch)
         # Only start signal extraction/vitals AFTER calibration is done
@@ -210,7 +210,11 @@ class RPPGEngine:
         pulse_signal = self._fused_pos_algorithm(rgb_array)
 
         if pulse_signal is None:
-            result.message = "Signal noise too high."
+            if self._last_vitals:
+                result.vitals = self._last_vitals
+                result.message = "⚡ Recovering signal from cache..."
+                return result
+            result.message = "Signal noise high - stay still..."
             return result
 
         self._pulse_signal = pulse_signal

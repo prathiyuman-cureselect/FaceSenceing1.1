@@ -154,7 +154,7 @@ const App: React.FC = () => {
       if (data.fps_actual) next.fps = data.fps_actual;
 
       // Phase switch: face → vitals
-      if (next.scanPhase === 'face' && data.vitals && !data.message?.includes('Scanning Face')) {
+      if (next.scanPhase === 'face' && (data.message === 'PHASE_DETECTION_COMPLETE' || data.vitals)) {
         next.scanPhase = 'vitals';
         next.message = '⚡ Optical Lock Achieved. Sensing Physiological Signal...';
       }
@@ -313,11 +313,15 @@ const App: React.FC = () => {
         setTimerText('✅ Scan Window Complete!');
         autoCompleteSession();
       } else {
+        // Failsafe: if we've been scanning for >10s and still in 'face' phase, force 'vitals'
+        if (scanStateRef.current.scanPhase === 'face' && elapsed > 10) {
+          setScanState(prev => ({ ...prev, scanPhase: 'vitals' }));
+        }
+
         if (scanStateRef.current.scanPhase === 'vitals') {
           setTimerText(`${currentStep} ${progress}%`);
         } else {
-          // Use backend's fast-tracking message during face lock
-          setTimerText(scanStateRef.current.message || 'Searching for Face...');
+          setTimerText(scanStateRef.current.message || 'Analyzing Face Profile...');
         }
       }
     }, 1000);
@@ -415,13 +419,13 @@ const App: React.FC = () => {
     stopCamera(activeStreamRef.current);
     activeStreamRef.current = null;
 
-    if (finalResults && currentState.allHR.length >= 3) {
+    if (finalResults && currentState.allHR.length >= 1) {
       setResults(finalResults);
       setShowResults(true);
     } else {
-      const msg = currentState.allHR.length > 0
-        ? "Not enough stable data was captured (need at least 15 seconds of clean signal). Please stay completely still in a well-lit area."
-        : "No vitals data was captured. Please ensure your face is clearly visible and stay still.";
+      const msg = currentState.allHR.length === 0
+        ? "No biometric signal was analyzed. Please ensure your face is well-lit and stay still for the full 60 seconds."
+        : `Only ${currentState.allHR.length} samples were captured. Stay still for longer to get more accurate data.`;
       alert(`⚠️ SCAN INCOMPLETE\n\n${msg}`);
       setStartupHidden(false);
     }
@@ -548,8 +552,7 @@ const App: React.FC = () => {
   // ─── Derived state for display ─────────────────────────────────────────────
 
   const isScanning =
-    scanState.isRunning &&
-    (scanState.scanPhase === 'face' || scanState.allHR.length < 3);
+    scanState.isRunning && (scanState.scanPhase === 'face');
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
