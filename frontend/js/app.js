@@ -489,18 +489,49 @@ function stopFrameCapture() {
 async function startSession() {
     if (state.isRunning) return;
 
+    // Provide immediate feedback on the button
+    const originalBtnText = DOM.btnStart.textContent;
     DOM.btnStart.disabled = true;
+    DOM.btnStart.textContent = "⌛ Initializing Camera...";
+
     state.isRunning = true;
 
-    const cameraOk = await initCamera();
-    if (!cameraOk) {
+    try {
+        const cameraOk = await initCamera();
+        if (!cameraOk) {
+            state.isRunning = false;
+            DOM.btnStart.disabled = false;
+            DOM.btnStart.textContent = originalBtnText;
+            return;
+        }
+
+        // Camera is OK, show the dashboard immediately to improve perceived speed
+        DOM.btnStart.textContent = "🔌 Connecting to Server...";
+        DOM.startupOverlay.classList.add('hidden');
+
+        // Comprehensive state reset for ALL accumulation arrays
+        const accumulationKeys = [
+            'allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV',
+            'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI',
+            'allSympathetic', 'allParasympathetic', 'allPRQ', 'allWellness',
+            'allAge', 'allGender', 'allHemoglobin', 'allGlucose', 'allHbA1c',
+            'allHydration', 'allCardioAge', 'allVascularHealth', 'allHypertensionRisk',
+            'allCardiacIndex'
+        ];
+        accumulationKeys.forEach(k => { if (state[k]) state[k] = []; });
+
+        state.goodMeasurements = 0;
+        state.totalMeasurements = 0;
+
+        connectWebSocket();
+    } catch (err) {
+        console.error("Session start failed:", err);
         state.isRunning = false;
         DOM.btnStart.disabled = false;
-        return;
+        DOM.btnStart.textContent = originalBtnText;
+        DOM.startupOverlay.classList.remove('hidden');
+        alert("Startup failed. Please check your camera permissions.");
     }
-
-    DOM.startupOverlay.classList.add('hidden');
-    connectWebSocket();
 }
 
 async function stopSession() {
