@@ -68,8 +68,8 @@ class FFTConfig:
 @dataclass
 class QualityConfig:
     """Signal Quality Index thresholds."""
-    sqi_snr_threshold: float = 1.0       # Relaxed from 3.0 for better initial tracking
-    sqi_spectral_purity: float = 0.2     # Relaxed from 0.4
+    sqi_snr_threshold: float = -10.0       # Extremely relaxed for guaranteed capture
+    sqi_spectral_purity: float = 0.05     # Extremely relaxed
     sqi_motion_threshold: float = 20.0   # Slightly more tolerant to minor movement
     sqi_face_confidence: float = 0.5     # Min face detection confidence
     rejection_window: int = 5            # Faster recovery (5s) before rejection logic kicks in

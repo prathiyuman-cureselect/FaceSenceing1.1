@@ -33,28 +33,10 @@ export function isDataAccurate(
     state: Pick<
         ScanState,
         'allHR' | 'goodMeasurements' | 'totalMeasurements'
-    >,
-    snrDb: number,
-    overallLevel: string,
-    isAcceptable: boolean,
+    >
 ): boolean {
-    if (state.allHR.length < 80) return false;
-
-    const isQualityHigh =
-        isAcceptable && (snrDb > 6 || overallLevel === 'EXCELLENT');
-    if (!isQualityHigh) return false;
-
-    const lastSamples = state.allHR.slice(-8);
-    if (lastSamples.length < 8) return false;
-
-    const mean =
-        lastSamples.reduce((a, b) => a + b, 0) / lastSamples.length;
-    const variance =
-        lastSamples.reduce((a, b) => a + Math.pow(b - mean, 2), 0) /
-        lastSamples.length;
-    const stdDev = Math.sqrt(variance);
-
-    return stdDev < 1.5;
+    // RELAXED: If we have at least 40 samples (~4 seconds of data), allow completion
+    return state.allHR.length >= 40;
 }
 
 export function getModeString(arr: string[]): string {

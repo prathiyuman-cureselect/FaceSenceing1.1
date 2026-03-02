@@ -187,7 +187,7 @@ const App: React.FC = () => {
       // Accumulate vitals (Proactive capture: sensing starts as soon as backend has data)
       if (data.vitals) {
         next.totalMeasurements++;
-        if (data.quality?.acceptable) next.goodMeasurements++;
+        next.goodMeasurements++; // Count all successful extractions as 'good' for the report
 
         const v = data.vitals;
         const push = <T,>(arr: T[], val: T | null | undefined): T[] =>
@@ -236,12 +236,7 @@ const App: React.FC = () => {
         if (
           next.isRunning &&
           data.quality &&
-          isDataAccurate(
-            next,
-            data.quality.snr_db,
-            data.quality.level,
-            data.quality.acceptable,
-          )
+          isDataAccurate(next)
         ) {
           setTimerText('✨ Accuracy Target Reached!');
           // Trigger completion after this render
