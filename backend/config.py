@@ -16,8 +16,8 @@ class CameraConfig:
     device_id: int = 0
     frame_width: int = 640
     frame_height: int = 480
-    fps: float = 30.0
-    warmup_frames: int = 30  # Frames to discard at startup
+    fps: float = 12.0        # Optimized for web-socket transmission
+    warmup_frames: int = 10  # Reduced for faster startup
 
 
 @dataclass
@@ -31,7 +31,7 @@ class ROIConfig:
     cheek_ratio_bottom: float = 0.85
     cheek_ratio_left: float = 0.15
     cheek_ratio_right: float = 0.85
-    min_face_size: int = 50  # Lowered from 80 for distance sensing
+    min_face_size: int = 40  # Support mobile and distance sensing
 
 
 @dataclass

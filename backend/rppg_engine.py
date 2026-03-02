@@ -84,11 +84,13 @@ class RPPGEngine:
 
         # Face Tracking Robustness
         self._face_lost_counter = 0
-        self._max_face_lost = 15  # ~0.5s grace period
+        self._max_face_lost = 100 # Aggressive coasting (approx 8-10 seconds)
         
         # Session tracking
         self._frames_processed: int = 0
         self._start_time: float = time.time()
+        self._last_frame_time: float = time.time()
+        self._fps_history: deque = deque(maxlen=50) # Average over last 50 frames
         self._last_measurement: Optional[MeasurementResult] = None
 
     def process_frame(self, frame: np.ndarray) -> MeasurementResult:
@@ -98,27 +100,42 @@ class RPPGEngine:
         result = MeasurementResult()
         result.fps_actual = float(self.fps)
 
+        # Step 0: Dynamic FPS Calibration (Crucial for correct filtering)
+        current_time = time.time()
+        dt = current_time - self._last_frame_time
+        if 0.01 < dt < 1.0:
+            actual_fps = 1.0 / dt
+            self._fps_history.append(actual_fps)
+            avg_fps = np.mean(self._fps_history)
+            if abs(avg_fps - self.fps) > 1.0:
+                self.fps = float(avg_fps)
+                self.signal_processor.update_fps(self.fps)
+        self._last_frame_time = current_time
+
         # Step 1: High-precision Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
         
         if face_rect is None:
             self._face_lost_counter += 1
-            if self._face_lost_counter <= self._max_face_lost:
+            if self._face_lost_counter <= self._max_face_lost and self.face_detector._prev_face_rect:
                 # Coasting on last known face position
                 face_rect = self.face_detector._prev_face_rect
-                face_confidence = 0.5 # Reduced confidence during coasting
-                result.face_detected = face_rect is not None
+                face_confidence = 0.4 # Reduced confidence during coasting
+                result.face_detected = True # Keep 'detected' true during coasting
             else:
                 result.face_detected = False
         else:
             self._face_lost_counter = 0
             result.face_detected = True
 
-        result.face_rect = face_rect
+        result.face_rect = [int(v) for v in face_rect] if face_rect is not None else None
 
         if not result.face_detected:
             result.message = "Searching for face... position your head in the frame"
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
+            # Ensure we send the last known vitals if available even if face is lost
+            if self._last_vitals:
+                result.vitals = self._last_vitals
             return result
 
         # Step 1b: Face Scanning / Calibration Phase
@@ -146,14 +163,24 @@ class RPPGEngine:
                     self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
                 else:
                     self._stable_sentiment = "Neutral"
+                
+                # Report DETECTION_COMPLETE once, but keep updating stable values
                 result.message = "PHASE_DETECTION_COMPLETE"
-                self._face_lost_counter = 0 # Reset lost counter on valid scan phase
+                self._face_lost_counter = 0 
+        
+        if self._age_history:
+            self._stable_age = int(np.median(self._age_history))
+        if self._gender_history:
+            self._stable_gender = str(max(set(self._gender_history), key=self._gender_history.count))
+        if self._sentiment_history:
+            self._stable_sentiment = str(max(set(self._sentiment_history), key=self._sentiment_history.count))
+
+        # PROACTIVE REPORTING: If we don't have stable values yet, use the last sample!
+        result.estimated_age = self._stable_age or (int(self._age_history[-1]) if self._age_history else None)
+        result.estimated_gender = self._stable_gender or (str(self._gender_history[-1]) if self._gender_history else None)
+        result.estimated_sentiment = self._stable_sentiment or (str(self._sentiment_history[-1]) if self._sentiment_history else "Neutral")
         
         self._frames_processed += 1 # Total frames processed (including no face)
-
-        result.estimated_age = self._stable_age
-        result.estimated_gender = self._stable_gender
-        result.estimated_sentiment = self._stable_sentiment
 
         # Step 2: Motion Robustness
         self._estimate_motion(frame)
@@ -162,10 +189,7 @@ class RPPGEngine:
             # No early return here - keep processing!
 
         # Step 3: High-Fidelity Signal Extraction (Multi-Patch)
-        # Only start signal extraction/vitals AFTER calibration is done
-        if self._is_calibrating:
-            return result
-
+        # SENSE PROACTIVELY: Start signal extraction even during calibration for speed
         rois = self.face_detector.extract_roi(frame, face_rect)
         
         # Flatten all patches from forehead and cheeks into one list
@@ -204,7 +228,7 @@ class RPPGEngine:
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
         # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
-        if buffer_len < 30: # Minimum 3.0s for accurate HR sensing
+        if buffer_len < 15: # Decreased to 1.5s for faster initial vitals
             result.message = f"Locking Pulse... {result.buffer_fill:.0f}%"
             return result
             
@@ -233,14 +257,17 @@ class RPPGEngine:
 
         # Step 7: Vitals Computation
         vitals = VitalSigns()
-        vitals.heart_rate = self.signal_processor.compute_heart_rate(hr_filtered)
-        vitals.respiratory_rate = self.signal_processor.compute_respiratory_rate(rr_filtered)
+        hr = self.signal_processor.compute_heart_rate(hr_filtered)
+        vitals.heart_rate = float(hr) if hr else None
+        
+        rr = self.signal_processor.compute_respiratory_rate(rr_filtered)
+        vitals.respiratory_rate = float(rr) if rr else None
 
         # HRV Metrics
         hrv_metrics = self.signal_processor.compute_hrv(hr_filtered)
-        vitals.hrv_rmssd = hrv_metrics["rmssd"]
-        vitals.stress_index = hrv_metrics["stress_index"]
-        vitals.lf_hf_ratio = hrv_metrics["lf_hf_ratio"]
+        vitals.hrv_rmssd = float(hrv_metrics["rmssd"]) if hrv_metrics["rmssd"] else None
+        vitals.stress_index = float(hrv_metrics["stress_index"]) if hrv_metrics["stress_index"] else None
+        vitals.lf_hf_ratio = float(hrv_metrics["lf_hf_ratio"]) if hrv_metrics["lf_hf_ratio"] else None
 
         # Advanced Vitals Estimation
         if vitals.heart_rate:
@@ -248,35 +275,47 @@ class RPPGEngine:
             rgb_1d = np.mean(rgb_array, axis=1) # (Time, 3)
             
             # Amplitude for BP: We use the STD of the filtered signal
-            # Note: fused pulse was normalized, but we can recover physical amplitude 
-            # by looking at the raw patch signals if needed. For now, use relative power.
-            amp = np.std(hr_filtered) 
+            amp = float(np.std(hr_filtered))
             
-            vitals.blood_pressure_sys, vitals.blood_pressure_dia = self.signal_processor.estimate_bp(
-                vitals.heart_rate, amp, hr_filtered=hr_filtered, rgb_array=rgb_1d
+            # Step 8: Quality Assurance (Calculated early for BP trust weighting)
+            quality = self.signal_processor.compute_sqi(
+                raw_signal=pulse_signal,
+                filtered_signal=hr_filtered,
+                face_confidence=float(face_confidence),
+                motion_score=float(self._motion_score),
             )
+
+            sbp, dbp = self.signal_processor.estimate_bp(
+                float(vitals.heart_rate), 
+                amp, 
+                hr_filtered=hr_filtered, 
+                rgb_array=rgb_1d,
+                sqi_score=float(quality.snr_db)
+            )
+            vitals.blood_pressure_sys = float(sbp)
+            vitals.blood_pressure_dia = float(dbp)
             vitals.spo2_estimate = self.signal_processor.estimate_spo2(rgb_1d[:, 0], rgb_1d[:, 2])
             
             # --- Comprehensive Health Proxies ---
             if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
                 total = vitals.lf_hf_ratio + 1.0
-                vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
-                vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
+                vitals.sympathetic_activity = float(round(min(100, (vitals.lf_hf_ratio / total) * 100), 1))
+                vitals.parasympathetic_activity = float(round(min(100, (1.0 / total) * 100), 1))
 
             # Blood Markers (using averaged spatial signal)
-            r_g_ratio = np.mean(rgb_1d[:, 0]) / (np.mean(rgb_1d[:, 1]) + 1e-10)
-            vitals.hemoglobin = round(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)), 1)
+            r_g_ratio = float(np.mean(rgb_1d[:, 0]) / (np.mean(rgb_1d[:, 1]) + 1e-10))
+            vitals.hemoglobin = float(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)))
             
-            vitals.perfusion_index = self.signal_processor.compute_perfusion_index(hr_filtered, np.mean(rgb_1d, axis=0))
-            vitals.blood_glucose = round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0)
-            vitals.hba1c = round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1)
-            vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_1d[:, 2]) * 100)), 1)
+            vitals.perfusion_index = float(self.signal_processor.compute_perfusion_index(hr_filtered, np.mean(rgb_1d, axis=0)))
+            vitals.blood_glucose = float(round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0))
+            vitals.hba1c = float(round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1))
+            vitals.hydration_index = float(round(max(0, min(10.0, 8.5 - np.std(rgb_1d[:, 2]) * 100)), 1))
             
             # Risks & Cardiovascular Age
-            base_age = self._stable_age or 30
+            base_age = int(self._stable_age or 30)
             vitals.cardio_age = int(base_age + (vitals.stress_index / 100 if vitals.stress_index else 0))
-            vitals.vascular_health = round(max(0, min(100, 100 - (vitals.cardio_age - base_age) * 10)), 1)
-            vitals.cardiac_index = round(max(2.0, min(4.5, 3.0 + (vitals.heart_rate - 70) * 0.01)), 2)
+            vitals.vascular_health = float(round(max(0, min(100, 100 - (vitals.cardio_age - base_age) * 10)), 1))
+            vitals.cardiac_index = float(round(max(2.0, min(4.5, 3.0 + (vitals.heart_rate - 70) * 0.01)), 2))
             
             if vitals.blood_pressure_sys > 140: vitals.hypertension_risk = "High"
             elif vitals.blood_pressure_sys > 130: vitals.hypertension_risk = "Elevated"
@@ -284,18 +323,10 @@ class RPPGEngine:
 
             # Wellness Score
             ws_comp = []
-            if vitals.heart_rate: ws_comp.append(max(0, 10 - abs(vitals.heart_rate - 70) * 0.2))
-            if vitals.stress_index: ws_comp.append(max(0, 10 - vitals.stress_index / 100))
-            if vitals.vascular_health: ws_comp.append(vitals.vascular_health / 10.0)
-            if ws_comp: vitals.wellness_score = round(sum(ws_comp) / len(ws_comp), 1)
-
-        # Step 8: Quality Assurance
-        quality = self.signal_processor.compute_sqi(
-            raw_signal=pulse_signal,
-            filtered_signal=hr_filtered,
-            face_confidence=face_confidence,
-            motion_score=self._motion_score,
-        )
+            if vitals.heart_rate: ws_comp.append(float(max(0, 10 - abs(vitals.heart_rate - 70) * 0.2)))
+            if vitals.stress_index: ws_comp.append(float(max(0, 10 - vitals.stress_index / 100)))
+            if vitals.vascular_health: ws_comp.append(float(vitals.vascular_health / 10.0))
+            if ws_comp: vitals.wellness_score = float(round(sum(ws_comp) / len(ws_comp), 1))
 
         # RELAXED: Never early return here. Always try to show results.
         result.message = f"SQI: {quality.overall_level.value}"
@@ -380,8 +411,8 @@ class RPPGEngine:
         """
         if len(signal) < 20: return 0.0
         
-        # Power Spectral Density
-        freqs, psd = self.signal_processor.compute_fft(signal)
+        # Power Spectral Density (3 value return)
+        freqs, psd, _ = self.signal_processor.compute_fft(signal)
         
         # Define HR band (0.7 - 3.0 Hz)
         hr_mask = (freqs >= 0.7) & (freqs <= 3.0)

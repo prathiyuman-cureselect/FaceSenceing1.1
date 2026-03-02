@@ -27,7 +27,7 @@ class FaceDetector:
         self._prev_face_rect: Optional[Tuple[int, int, int, int]] = None
         self._smooth_alpha = 0.3  # Exponential smoothing factor
         self._no_face_count = 0
-        self._max_no_face = 10  # Frames before resetting tracker
+        self._max_no_face = 60  # Increased to 5 seconds to prevent dropout 
         self._frame_count = 0
         self._detect_every_n_frames = 3  # Detect every 3 frames if stable
         self._last_confidence = 0.0
@@ -59,10 +59,21 @@ class FaceDetector:
         """
         self._frame_count += 1
 
-        # If we have a stable track, skip some detections to save CPU
+        # Initial lock Phase: Never skip detection for the first 100 frames to ensure solid lock
+        if self._frame_count < 100:
+             if self._use_dnn:
+                rect, conf = self._detect_dnn(frame)
+             else:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                rect, conf = self._detect_haar_optimized(clahe.apply(gray))
+             self._last_confidence = conf
+             return rect, conf
+
+        # Stable tracking Phase: Skip some frames to save CPU
         if (
             self._prev_face_rect is not None
-            and self._last_confidence > 0.7
+            and self._last_confidence > 0.8
             and self._frame_count % self._detect_every_n_frames != 0
         ):
             return self._prev_face_rect, self._last_confidence
@@ -90,8 +101,9 @@ class FaceDetector:
 
         if len(faces) == 0:
             self._no_face_count += 1
-            # Coasting: Return previous rect if we just lost it briefly
-            if self._prev_face_rect and self._no_face_count < 5:
+            # Aggressive Coasting: Return previous rect if we just lost it.
+            # This prevents the "Searching for face" lockout durante minor moves.
+            if self._prev_face_rect and self._no_face_count < 60:
                 return self._prev_face_rect, 0.4
             return None, 0.0
 
@@ -207,9 +219,16 @@ class FaceDetector:
                     py1 = y1 + j * ph
                     px2 = px1 + pw
                     py2 = py1 + ph
-                    patch = frame[py1:py2, px1:px2]
-                    if patch.size > 0:
-                        patches.append(patch)
+                    # Ensure patch is within frame boundaries
+                    if py1 >= 0 and py2 <= h_orig and px1 >= 0 and px2 <= w_orig:
+                        patch = frame[py1:py2, px1:px2]
+                        if patch.size > 0:
+                            patches.append(patch)
+                        else:
+                            patches.append(np.zeros((10, 10, 3), dtype=np.uint8))
+                    else:
+                        # Return empty patch placeholder to maintain list length
+                        patches.append(np.zeros((10, 10, 3), dtype=np.uint8))
             return patches
 
         # Define 3 core capture zones
@@ -234,10 +253,19 @@ class FaceDetector:
             (2, 2)
         )
 
+        # 4. Center Face (Fallback grid)
+        # Use the absolute center of the face as a high-density capture zone
+        center_patches = get_patches(
+            x + int(w * 0.25), y + int(h * 0.25),
+            x + int(w * 0.75), y + int(h * 0.75),
+            (2, 2)
+        )
+
         return {
             "forehead": forehead_patches,
             "left_cheek": l_cheek_patches,
-            "right_cheek": r_cheek_patches
+            "right_cheek": r_cheek_patches,
+            "center_face": center_patches
         }
 
     def get_skin_mask(self, roi: np.ndarray) -> np.ndarray:
@@ -269,39 +297,37 @@ class FaceDetector:
     ) -> Optional[np.ndarray]:
         """
         Extract pulse-rich RGB averages from refined skin ROIs.
-        Uses spatial averaging and skin-masking.
+        Correctly iterates over patch lists to avoid attribute errors.
         """
         rois = self.extract_roi(frame, face_rect)
-
         signals = []
-        for name, roi in rois.items():
-            if roi.size == 0:
-                continue
+
+        # Interate over each zone (Forehead, Cheeks, etc.)
+        for zone_name, patches in rois.items():
+            for patch in patches:
+                if patch.size == 0:
+                    continue
+                    
+                mask = self.get_skin_mask(patch)
                 
-            mask = self.get_skin_mask(roi)
-            
-            # If mask is good, use it (precise)
-            if mask.size > 0 and np.count_nonzero(mask) > 20:
-                # We calculate mean across masked regions
-                # Green channel is the primary carrier of the pulse signal in rPPG
-                b = np.mean(roi[:, :, 0][mask > 0])
-                g = np.mean(roi[:, :, 1][mask > 0])
-                r = np.mean(roi[:, :, 2][mask > 0])
-                signals.append(np.array([r, g, b]))
-            else:
-                # Fallback: Just the center of the ROI
-                h, w = roi.shape[:2]
-                center_roi = roi[h//4:3*h//4, w//4:3*w//4]
-                if center_roi.size > 0:
-                    r = np.mean(center_roi[:, :, 2])
-                    g = np.mean(center_roi[:, :, 1])
-                    b = np.mean(center_roi[:, :, 0])
+                # If mask is good, use it (precise physiological capture)
+                # Lowered requirement to 10 pixels for smaller patches
+                if mask.size > 0 and np.count_nonzero(mask) > 10:
+                    b = np.mean(patch[:, :, 0][mask > 0])
+                    g = np.mean(patch[:, :, 1][mask > 0])
+                    r = np.mean(patch[:, :, 2][mask > 0])
                     signals.append(np.array([r, g, b]))
+                else:
+                    # Fallback: Just the center of the patch if mask fails
+                    h, w = patch.shape[:2]
+                    crop = patch[h//4:3*h//4, w//4:3*w//4]
+                    if crop.size > 0:
+                        signals.append(np.mean(crop, axis=(0, 1)))
 
         if not signals:
             return None
 
-        # Return mean RGB values across all ROIs
+        # Absolute fallback: if signal is too weak, use median face center
         return np.mean(signals, axis=0)
 
     def estimate_age(self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]) -> Optional[int]:

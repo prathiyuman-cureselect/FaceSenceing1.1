@@ -242,7 +242,7 @@ class SignalProcessor:
 
         # Clamp HR to realistic resting range to avoid noise-induced 150+ spikes
         final_hr = max(45.0, min(160.0, final_hr))
-        return round(final_hr, 1)
+        return float(round(final_hr, 1))
 
     def compute_respiratory_rate(
         self, filtered_signal: np.ndarray
@@ -346,99 +346,58 @@ class SignalProcessor:
         pulse_amplitude: float,
         hr_filtered: np.ndarray = None,
         rgb_array: np.ndarray = None,
+        sqi_score: float = 1.0
     ) -> Tuple[float, float]:
         """
         Multi-factor Blood Pressure estimation using Pulse Wave Analysis.
-
-        Uses 5 physiological correlates detectable from camera rPPG:
-        1. Heart Rate deviation — elevated HR correlates with higher BP
-        2. Pulse Amplitude (AC) — stronger pulsations indicate higher pressure
-        3. Pulse Wave Variability — beat-to-beat variation in amplitude
-        4. Signal energy — total power in the pulse waveform
-        5. Red channel intensity — facial flushing / vasoconstriction proxy
+        High-fidelity Mode: Uses SQI to determine trust level in high/low peaks.
         """
-        # Baseline BP (from calibration or healthy default)
+        # Baseline BP
         base_sys = self.calib_data.get('baseline_sys', 120.0)
         base_dia = self.calib_data.get('baseline_dia', 80.0)
 
-        # ── Factor 1: Heart Rate deviation ──
-        # Conservative weighting (0.8 instead of 1.5) to avoid excessive spikes
+        # ── Confidence Weighting (SQI score 0-1) ──
+        # We only trust large deviations from 'normal' if the signal is clear.
+        # If signal is noisy, we trend toward the healthy baseline.
+        trust = min(1.0, max(0.0, (sqi_score - 0.2) / 0.6))
+        
+        # ── Factor 1: Heart Rate Impact ──
         hr_dev = hr - 72.0
-        hr_sys_contrib = hr_dev * 0.8
-        hr_dia_contrib = hr_dev * 0.4
+        hr_sys_contrib = hr_dev * 0.7 * trust
+        hr_dia_contrib = hr_dev * 0.4 * trust
 
-        # ── Factor 2: Pulse Amplitude (AC component / raw pulse strength) ──
-        # Since POS is now amplitude-preserved, 'pulse_amplitude' is the raw AC/DC ratio.
-        # This is the gold standard for optical BP estimation.
-        # Scale for 170/90 detection: Subjects with high hemodynamic force (AC > 2%)
-        # will now see a much more significant pressure lift.
-        amp_sys_contrib = pulse_amplitude * 1200.0 
-        amp_dia_contrib = pulse_amplitude * 600.0
+        # ── Factor 2: Pulse Amplitude (AC) ──
+        # High amplitude in a clean signal = higher pressure
+        amp_sys_contrib = pulse_amplitude * 1400.0 * trust
+        amp_dia_contrib = pulse_amplitude * 700.0 * trust
 
-        # ... (Factors 3 & 4 with raw amplitude weighting)
-        pwv_contrib_sys = 0.0
-        pwv_contrib_dia = 0.0
-        if hr_filtered is not None and len(hr_filtered) > 60:
-            peaks = []
-            for i in range(1, len(hr_filtered) - 1):
-                if hr_filtered[i] > hr_filtered[i-1] and hr_filtered[i] > hr_filtered[i+1]:
-                    if hr_filtered[i] > 0.1 * np.max(hr_filtered):
-                        peaks.append(hr_filtered[i])
-            if len(peaks) > 3:
-                peak_std = np.std(peaks)
-                peak_mean = np.mean(peaks)
-                if peak_mean > 0:
-                    variability = peak_std / peak_mean
-                    pwv_contrib_sys = variability * 50.0
-                    pwv_contrib_dia = variability * 25.0
+        # ── Factor 3: Pulse Wave Slope (Arterial Stiffness) ──
+        slope_contrib = 0.0
+        if hr_filtered is not None and len(hr_filtered) > 20:
+            gradient = np.gradient(hr_filtered)
+            max_slope = np.max(gradient)
+            # Stiffer arteries (high BP) lead to faster pulse rise
+            slope_contrib = max_slope * 40.0 * trust
 
-        # ── Factor 4: Signal Energy (Raw Joules proxy) ──
-        energy_contrib_sys = 0.0
-        energy_contrib_dia = 0.0
-        if hr_filtered is not None and len(hr_filtered) > 30:
-            # High energy in the raw pulse indicates strong myocardial contraction
-            signal_energy = np.sum(hr_filtered ** 2) / len(hr_filtered)
-            energy_contrib_sys = min(signal_energy * 2000.0, 60.0)
-            energy_contrib_dia = min(signal_energy * 1000.0, 30.0)
-
-        # ── Factor 5: Red Channel Intensity (facial flushing) ──
-        red_contrib_sys = 0.0
-        red_contrib_dia = 0.0
+        # ── Factor 4: Vascular Tone (Red/Green Ratio) ──
+        vaso_contrib = 0.0
         if rgb_array is not None and len(rgb_array) > 10:
-            red_mean = np.mean(rgb_array[:, 0])
-            green_mean = np.mean(rgb_array[:, 1])
-            if green_mean > 0:
-                rg_ratio = red_mean / green_mean
-                # Flushing proxy (r/g ratio > 1.05)
-                if rg_ratio > 1.05:
-                    red_contrib_sys = (rg_ratio - 1.05) * 80.0
-                    red_contrib_dia = (rg_ratio - 1.05) * 40.0
+            rg_ratio = np.mean(rgb_array[:, 0]) / (np.mean(rgb_array[:, 1]) + 1e-10)
+            if rg_ratio > 1.1:
+                vaso_contrib = (rg_ratio - 1.1) * 60.0 * trust
 
         # ── Combine all factors ──
-        sbp = (
-            base_sys
-            + hr_sys_contrib
-            + amp_sys_contrib
-            + pwv_contrib_sys
-            + energy_contrib_sys
-            + red_contrib_sys
-        )
-        dbp = (
-            base_dia
-            + hr_dia_contrib
-            + amp_dia_contrib
-            + pwv_contrib_dia
-            + energy_contrib_dia
-            + red_contrib_dia
-        )
+        # For a high BP person with clear signal, these will now add up correctly to 170+
+        sbp = base_sys + hr_sys_contrib + amp_sys_contrib + slope_contrib + vaso_contrib
+        dbp = base_dia + hr_dia_contrib + amp_dia_contrib + (slope_contrib * 0.5)
 
-        # Ensure pulse pressure (SBP - DBP) stays physiologically valid (>= 25)
-        if sbp - dbp < 25:
-            dbp = sbp - 25
+        # Ensure physiological pulse pressure
+        if sbp - dbp < 30:
+            dbp = sbp - 30
 
-        # Clinical physiological clamps for safety
-        sbp = max(95.0, min(180.0, sbp))
-        dbp = max(60.0, min(110.0, dbp))
+        # CLINICAL CLAMPS (Wider to allow true high BP detection)
+        sbp = max(90.0, min(210.0, sbp))
+        dbp = max(58.0, min(125.0, dbp))
 
         return round(sbp, 1), round(dbp, 1)
 
@@ -575,12 +534,8 @@ class SignalProcessor:
             
             # Map camera ratio (typically 0.4 to 1.5) to a tight SpO2 distribution
             # Higher ratio usually correlates with lower SpO2.
-            deviation = (1.0 - ratio) * 2.0
-            
-            spo2 = base_spo2 + deviation
-            # Tightly clamp SpO2 to realistic healthy human limits
-            spo2 = max(94.0, min(100.0, spo2))
-            return round(spo2, 1)
+            spo2 = 110 - 25 * ratio
+            return float(round(max(92.0, min(100.0, spo2)), 1))
         except Exception:
             return None
 
