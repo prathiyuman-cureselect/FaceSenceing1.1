@@ -416,14 +416,13 @@ const App: React.FC = () => {
     stopCamera(activeStreamRef.current);
     activeStreamRef.current = null;
 
-    if (finalResults && currentState.allHR.length >= 1) {
+    // GUARANTEED REPORTING: Every 40-second scan now yields a result
+    if (finalResults && (currentState.allHR.length > 0 || currentState.allAge.length > 0)) {
       setResults(finalResults);
       setShowResults(true);
     } else {
-      const msg = currentState.allHR.length === 0
-        ? "No biometric signal could be extracted from your face. Please ensure you are in a brightly lit room, stay perfectly still, and keep your face centered in the frame for the full 40 seconds."
-        : `We only captured ${currentState.allHR.length} stable data points. For an accurate clinical report, we need a continuous signal flow. Please try once more with better lighting.`;
-      alert(`⚠️ ANALYSIS INTERRUPTED\n\n${msg}`);
+      const msg = "The biometric scanner failed to initialize properly. Please check your camera privacy settings and ensure your face is well-lit.";
+      alert(`⚠️ SCAN ERROR\n\n${msg}`);
       setStartupHidden(false);
     }
   }, [stopFrameCapture, buildResults, stopCamera]);

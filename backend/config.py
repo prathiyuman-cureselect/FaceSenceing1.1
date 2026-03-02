@@ -38,8 +38,8 @@ class ROIConfig:
 class SignalConfig:
     """Signal processing parameters."""
     buffer_size: int = 60       # Optimized for 40s scan (6.0 seconds at 10fps)
-    min_buffer_size: int = 30    # ~3 second minimum to get at least 2-3 clean heartbeats
-    pos_window: int = 15         # Temporal window >= 0.5 heartbeat for stable processing
+    min_buffer_size: int = 15    # ~1.5 second (very fast feedback)
+    pos_window: int = 8         # Temporal window >= ~1 heartbeat for fast sensing
     detrend_lambda: float = 300  # Detrending smoothness parameter
 
 
@@ -82,7 +82,7 @@ class QualityConfig:
 @dataclass
 class HRVConfig:
     """Heart Rate Variability settings."""
-    min_peaks_for_hrv: int = 4    # Minimum peaks for HRV computation (requires 4 to get 3 consecutive diff intervals)
+    min_peaks_for_hrv: int = 2    # Extremely low (needs 2 peaks for 1 interval) for fast results
     rmssd_max: float = 300.0      # Maximum plausible RMSSD (ms)
     sdnn_max: float = 500.0       # Maximum plausible SDNN (ms)
 

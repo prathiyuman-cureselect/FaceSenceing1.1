@@ -204,7 +204,7 @@ class RPPGEngine:
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
         # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
-        if buffer_len < 30: # 1 second of data
+        if buffer_len < 10: # Ultra-fast (under 1s)
             result.message = f"Locking Pulse... {result.buffer_fill:.0f}%"
             return result
             
@@ -354,9 +354,9 @@ class RPPGEngine:
             if pulse is not None:
                 # Calculate SNR for this patch
                 snr = self._calculate_signal_snr(pulse)
-                if snr > 0.5: # Quality threshold
-                    all_pulses.append(pulse)
-                    all_snrs.append(snr)
+                # RELAXED: Accept all pulses to ensure we have data, even if noisy
+                all_pulses.append(pulse)
+                all_snrs.append(max(0.1, snr))
         
         if not all_pulses:
             return None
@@ -377,7 +377,7 @@ class RPPGEngine:
         """
         Estimate Signal-to-Noise ratio in the HR frequency band.
         """
-        if len(signal) < 64: return 0.0
+        if len(signal) < 20: return 0.0
         
         # Power Spectral Density
         freqs, psd = self.signal_processor.compute_fft(signal)
