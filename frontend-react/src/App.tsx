@@ -49,6 +49,7 @@ const initialState = (): ScanState => ({
   faceRect: null,
   estimatedAge: null,
   estimatedGender: null,
+  estimatedSentiment: null,
   signalData: [],
   spectrumData: [],
   spectrumFreqs: [],
@@ -57,7 +58,7 @@ const initialState = (): ScanState => ({
   allHR: [], allRR: [], allSys: [], allDia: [], allSpo2: [], allTemp: [],
   allHRV: [], allSDNN: [], allPNN50: [], allStress: [], allLFHF: [], allPI: [],
   allSympathetic: [], allParasympathetic: [], allPRQ: [], allWellness: [],
-  allAge: [], allGender: [],
+  allAge: [], allGender: [], allSentiment: [],
   allHemoglobin: [], allGlucose: [], allHbA1c: [], allHydration: [],
   allCardioAge: [], allVascularHealth: [], allHypertensionRisk: [], allCardiacIndex: [],
   goodMeasurements: 0,
@@ -141,6 +142,7 @@ const App: React.FC = () => {
       next.faceRect = data.face_rect;
       next.estimatedAge = data.estimated_age;
       next.estimatedGender = data.estimated_gender;
+      next.estimatedSentiment = data.estimated_sentiment;
 
       // Quality chip text
       if (data.quality) {
@@ -151,14 +153,14 @@ const App: React.FC = () => {
       next.bufferFill = data.buffer_fill;
       if (data.fps_actual) next.fps = data.fps_actual;
 
-      // Phase switch: face → vitals
-      if (next.scanPhase === 'face' && data.vitals && data.buffer_fill >= 10) {
+      // Phase switch: face → vitals (Wait until calibration is done on backend)
+      if (next.scanPhase === 'face' && data.vitals && !data.message?.includes('Analyzing Face Profile')) {
         next.scanPhase = 'vitals';
         next.message = '💓 Sensors locked! Extracting vitals from face...';
       }
 
       // Vitals display
-      if (data.vitals && !data.message?.includes('Scanning Face')) {
+      if (data.vitals && !data.message?.includes('Analyzing Face Profile')) {
         next.currentVitals = data.vitals;
       }
 
@@ -177,9 +179,10 @@ const App: React.FC = () => {
         });
       }
 
-      // Age / gender accumulation
+      // Age / gender / sentiment accumulation
       if (data.estimated_age) next.allAge = [...next.allAge, data.estimated_age];
       if (data.estimated_gender) next.allGender = [...next.allGender, data.estimated_gender];
+      if (data.estimated_sentiment) next.allSentiment = [...next.allSentiment, data.estimated_sentiment];
 
       // Accumulate vitals during vitals phase
       if (next.scanPhase === 'vitals' && data.vitals) {
@@ -387,6 +390,7 @@ const App: React.FC = () => {
       htn_risk: getMostFrequentString(state.allHypertensionRisk),
       estimatedAge: median(state.allAge),
       estimatedGender: getMostFrequentString(state.allGender),
+      estimatedSentiment: getMostFrequentString(state.allSentiment),
       confidence,
       sessionId: state.sessionId ?? 'unknown',
     };
@@ -587,6 +591,7 @@ const App: React.FC = () => {
           qualityText={qualityText}
           estimatedAge={scanState.estimatedAge}
           estimatedGender={scanState.estimatedGender}
+          estimatedSentiment={scanState.estimatedSentiment}
           onStop={stopSession}
           onReset={resetSession}
         />

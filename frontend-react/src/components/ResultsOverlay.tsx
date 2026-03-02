@@ -185,6 +185,13 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = memo(({
                     </div>
                     <div className="hero-strip-divider" aria-hidden="true" />
                     <div className="hero-strip-item">
+                        <div className="hero-strip-label">Emotional State</div>
+                        <div className="hero-strip-value">
+                            {results.estimatedSentiment || 'Neutral'}
+                        </div>
+                    </div>
+                    <div className="hero-strip-divider" aria-hidden="true" />
+                    <div className="hero-strip-item">
                         <div className="hero-strip-label">Data Fidelity</div>
                         <div
                             className="hero-strip-value"

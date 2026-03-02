@@ -62,8 +62,10 @@ class RPPGEngine:
         self._calibration_frames = 150  # ~5 seconds at 30fps for stable profile
         self._age_history = []
         self._gender_history = []
+        self._sentiment_history = []
         self._stable_age = None
         self._stable_gender = None
+        self._stable_sentiment = None
         
         # History for result smoothing (Binah-style stability)
         self._hr_history: deque = deque(maxlen=10)
@@ -102,12 +104,15 @@ class RPPGEngine:
         if self._is_calibrating:
             est_age = self.face_detector.estimate_age(frame, face_rect)
             est_gender = self.face_detector.estimate_gender(frame, face_rect)
+            est_sentiment = self.face_detector.estimate_sentiment(frame, face_rect)
             
             if est_age: self._age_history.append(est_age)
             if est_gender: self._gender_history.append(est_gender)
+            if est_sentiment: 
+                self._sentiment_history.append(est_sentiment)
             
             progress = (self._frames_processed / self._calibration_frames) * 100
-            result.message = f"Scanning Face... {min(100, progress):.0f}%"
+            result.message = f"Analyzing Face Profile... {min(100, progress):.0f}%"
             
             if self._frames_processed >= self._calibration_frames:
                 self._is_calibrating = False
@@ -115,10 +120,16 @@ class RPPGEngine:
                     self._stable_age = int(np.median(self._age_history))
                 if self._gender_history:
                     self._stable_gender = max(set(self._gender_history), key=self._gender_history.count)
-                logger.info(f"Calibration complete: {self._stable_gender}, {self._stable_age}")
+                if self._sentiment_history:
+                    self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
+                else:
+                    self._stable_sentiment = "Neutral"
+                logger.info(f"Analysis complete: {self._stable_gender}, {self._stable_age}, {self._stable_sentiment}")
+                result.message = "Face Locked. Starting Vitals Scan..."
 
         result.estimated_age = self._stable_age
         result.estimated_gender = self._stable_gender
+        result.estimated_sentiment = self._stable_sentiment
 
         # Step 2: Motion Robustness
         self._estimate_motion(frame)
@@ -127,7 +138,10 @@ class RPPGEngine:
             return result
 
         # Step 3: High-Fidelity Signal Extraction (Multi-Patch)
-        # We extract signals from all 12 patches to perform spatial-temporal filtering
+        # Only start signal extraction/vitals AFTER calibration is done
+        if self._is_calibrating:
+            return result
+
         rois = self.face_detector.extract_roi(frame, face_rect)
         
         # Flatten all patches from forehead and cheeks into one list
@@ -160,8 +174,7 @@ class RPPGEngine:
 
         # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
         if buffer_len < self.config.min_buffer_size:
-            if not self._is_calibrating:
-                result.message = f"Analyzing Pulse... {result.buffer_fill:.0f}%"
+            result.message = f"Analyzing Pulse... {result.buffer_fill:.0f}%"
             return result
 
         # rgb_array shape: (Time, Patches, 3)

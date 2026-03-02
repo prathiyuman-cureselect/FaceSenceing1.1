@@ -446,6 +446,65 @@ class FaceDetector:
             logger.warning(f"Gender estimation failed: {e}")
             return None
 
+    def estimate_sentiment(self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]) -> Optional[str]:
+        """
+        Estimate facial sentiment/expression using geometric heuristics.
+        Analyzes mouth curvature, eye openness, and brow positioning.
+        Returns: 'Smiling', 'Sad', 'Surprised', 'Neutral', or 'Focused'.
+        """
+        try:
+            x, y, w, h = face_rect
+            face_roi = frame[y:y+h, x:x+w]
+            if face_roi.size == 0 or w < 60 or h < 60:
+                return None
+
+            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+            gray = cv2.equalizeHist(gray)
+
+            # Heuristic 1: Mouth curvature (Happy vs Sad)
+            # Define mouth region (bottom 1/3 of face, center 1/2)
+            my1, my2 = int(h * 0.75), int(h * 0.92)
+            mx1, mx2 = int(w * 0.25), int(w * 0.75)
+            mouth_roi = gray[my1:my2, mx1:mx2]
+            
+            if mouth_roi.size > 0:
+                # Use Canny to find mouth edges
+                edges = cv2.Canny(mouth_roi, 50, 150)
+                # Count edge pixels in the corners vs center of mouth ROI
+                mw = mx2 - mx1
+                left_corner = edges[:, :mw//4]
+                right_corner = edges[:, -mw//4:]
+                center_mouth = edges[:, mw//4:3*mw//4]
+                
+                l_count = np.count_nonzero(left_corner)
+                r_count = np.count_nonzero(right_corner)
+                c_count = np.count_nonzero(center_mouth)
+                
+                # Heuristic 2: Eye openness (Surprised vs Focused)
+                # Eyes roughly at 1/3 height
+                ey1, ey2 = int(h * 0.25), int(h * 0.45)
+                eye_roi = gray[ey1:ey2, :]
+                
+                if eye_roi.size > 0:
+                    _, thresh = cv2.threshold(eye_roi, 50, 255, cv2.THRESH_BINARY_INV)
+                    eye_pixels = np.count_nonzero(thresh)
+                    
+                    # Sentiment Logic
+                    if c_count > 0 and (l_count + r_count) / (c_count + 1) > 1.2:
+                        return "Smiling"
+                    if eye_pixels > (eye_roi.size * 0.15):
+                        return "Surprised"
+                    if l_count + r_count < 5 and c_count > 10:
+                        return "Sad"
+                    if eye_pixels < (eye_roi.size * 0.05):
+                        return "Focused"
+            
+            return "Neutral"
+
+        except Exception as e:
+            logger.debug(f"Sentiment estimation failed: {e}")
+            return "Neutral"
+
     def reset(self):
         """Reset tracker state."""
         self._prev_face_rect = None

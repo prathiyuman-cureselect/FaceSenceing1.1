@@ -49,6 +49,7 @@ export interface MeasurementData {
     face_rect: [number, number, number, number] | null;
     estimated_age: number | null;
     estimated_gender: string | null;
+    estimated_sentiment: string | null;
     buffer_fill: number;
     fps_actual: number;
     message: string;
@@ -88,6 +89,7 @@ export interface ScanState {
     faceRect: [number, number, number, number] | null;
     estimatedAge: number | null;
     estimatedGender: string | null;
+    estimatedSentiment: string | null;
     signalData: number[];
     spectrumData: number[];
     spectrumFreqs: number[];
@@ -112,6 +114,7 @@ export interface ScanState {
     allWellness: number[];
     allAge: number[];
     allGender: string[];
+    allSentiment: string[];
     allHemoglobin: number[];
     allGlucose: number[];
     allHbA1c: number[];
@@ -148,6 +151,7 @@ export interface FinalResults {
     htn_risk: string;
     estimatedAge: number | null;
     estimatedGender: string;
+    estimatedSentiment: string;
     confidence: number;
     sessionId: string;
 }

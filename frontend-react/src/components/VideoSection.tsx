@@ -12,6 +12,7 @@ interface VideoSectionProps {
     qualityText: string;
     estimatedAge: number | null;
     estimatedGender: string | null;
+    estimatedSentiment: string | null;
     onStop: () => void;
     onReset: () => void;
 }
@@ -27,6 +28,7 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
     qualityText,
     estimatedAge,
     estimatedGender,
+    estimatedSentiment,
     onStop,
     onReset,
 }) => {
@@ -55,6 +57,16 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
         if (estimatedGender === 'Female') return '♀️';
         return '';
     }, [estimatedGender]);
+
+    const sentimentEmoji = useMemo(() => {
+        switch (estimatedSentiment) {
+            case 'Smiling': return '😊';
+            case 'Sad': return '😟';
+            case 'Surprised': return '😲';
+            case 'Focused': return '🧠';
+            default: return '😐';
+        }
+    }, [estimatedSentiment]);
 
     const clampedBufferFill = useMemo(
         () => Math.max(0, Math.min(100, bufferFill)),
@@ -119,7 +131,7 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
                         <span className="age-badge-sub">FACE SCAN</span>
                         <span>
                             👤 {estimatedAge ? `~${estimatedAge} yrs` : '...'} · {genderIcon}{' '}
-                            {estimatedGender || '...'}
+                            {estimatedGender || '...'} · {sentimentEmoji} {estimatedSentiment || 'Neutral'}
                         </span>
                     </div>
                 )}
