@@ -258,72 +258,81 @@ class FaceDetector:
             if face_roi.size == 0 or w < 40 or h < 40:
                 return None
 
-            # Convert to grayscale and apply Gaussian blur to remove raw webcam noise
-            # (Webcam noise causes massive spikes in Laplacian variance, falsely aging the user)
-            gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
-
+            # Convert to grayscale
+            gray_full = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+            
+            # Use minimal blur for texture analysis to preserve wrinkles
+            gray_texture = cv2.GaussianBlur(gray_full, (3, 3), 0)
+            
             # 1. Wrinkle/texture score — Laplacian variance (higher = more detail/wrinkles)
-            forehead_region = gray[0:h//4, w//4:3*w//4]
+            # Forehead is a prime area for wrinkles
+            fh_y1, fh_y2 = 0, h // 4
+            fh_x1, fh_x2 = w // 4, 3 * w // 4
+            forehead_region = gray_texture[fh_y1:fh_y2, fh_x1:fh_x2]
+            
             if forehead_region.size == 0:
                 return None
+                
             laplacian_var = cv2.Laplacian(forehead_region, cv2.CV_64F).var()
 
             # 2. Skin smoothness — standard deviation of pixel intensities
-            skin_std = np.std(gray[h//4:3*h//4, w//4:3*w//4].astype(float))
+            # Older skin often has more pigment variation (age spots)
+            skin_region = gray_texture[h//4:3*h//4, w//4:3*w//4]
+            skin_std = np.std(skin_region.astype(float)) if skin_region.size > 0 else 20
 
             # 3. Under-eye texture (wrinkles around eyes indicate aging)
-            eye_region = gray[h//4:h//2, :]
+            eye_region = gray_texture[h//4:h//2, :]
             eye_texture = cv2.Laplacian(eye_region, cv2.CV_64F).var() if eye_region.size > 0 else 0
 
             # 4. Skin color features in LAB space
             lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
             l_mean = np.mean(lab[:, :, 0])
-            a_mean = np.mean(lab[:, :, 1])  # skin redness
             b_mean = np.mean(lab[:, :, 2])  # skin yellowness
 
             # 5. Face aspect ratio (children have rounder faces)
             aspect_ratio = w / max(h, 1)
 
             # Estimate age from features
-            # Base age: start from 24 (mid 20s baseline)
-            age = 24.0
+            # Base age: start from 25
+            age = 25.0
 
             # Wrinkle contribution (more wrinkles = older)
-            if laplacian_var > 800:
-                age += 20
-            elif laplacian_var > 400:
-                age += 12
-            elif laplacian_var > 200:
-                age += 5
-            elif laplacian_var < 50:
-                age -= 8  # Very smooth = younger
+            # Adjusted thresholds to be more sensitive to subtle wrinkles often lost in webcams
+            if laplacian_var > 600:
+                age += 25
+            elif laplacian_var > 300:
+                age += 15
+            elif laplacian_var > 150:
+                age += 8
+            elif laplacian_var < 40:
+                age -= 7  # Very smooth = younger
 
             # Skin uniformity (less uniform = older)
-            if skin_std > 45:
-                age += 8
-            elif skin_std > 30:
+            if skin_std > 40:
+                age += 10
+            elif skin_std > 25:
                 age += 5
-            elif skin_std < 18:
-                age -= 3
+            elif skin_std < 12:
+                age -= 4
 
             # Eye texture
-            if eye_texture > 500:
-                age += 8
-            elif eye_texture > 200:
-                age += 3
+            if eye_texture > 400:
+                age += 10
+            elif eye_texture > 150:
+                age += 4
 
-            # Skin color: older skin tends to be less vibrant
-            if l_mean < 120:
+            # Skin color: older skin tends to be less vibrant / more yellowish
+            if l_mean < 110:
+                age += 4
+            if b_mean > 135:
                 age += 3
-            if b_mean > 140:
-                age += 4  # more yellowish
 
             # Face shape
-            if aspect_ratio > 0.85:
-                age -= 3  # rounder = younger
+            if aspect_ratio > 0.82:
+                age -= 4  # rounder = younger
 
             # Clamp to reasonable range
-            age = max(15, min(80, age))
+            age = max(18, min(85, age))
 
             return int(round(age))
 
@@ -343,19 +352,18 @@ class FaceDetector:
             if face_roi.size == 0 or w < 40 or h < 40:
                 return None
 
-            gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+            gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (3, 3), 0)
 
             # Score: positive = male tendency, negative = female tendency
-            # Significant base bias towards Male to counteract the aggressive skin-smoothing blur
-            # which otherwise universally penalizes men for having "female-like" smooth skin data
-            score = 2.5
+            # Slightly higher base bias towards Male to counteract camera smoothing
+            score = 1.8
 
-            # 1. Face aspect ratio: Males tend to have wider faces relative to height
+            # 1. Face aspect ratio: Males tend to have wider faces/jaws
             aspect = w / max(h, 1)
-            if aspect > 0.85:
-                score += 1.0  # wider jaw = more masculine
-            elif aspect < 0.65:
-                score -= 1.0  # narrower/oval = more feminine
+            if aspect > 0.83:
+                score += 1.2
+            elif aspect < 0.68:
+                score -= 1.2
 
             # 2. Jaw region intensity contrast (lower 1/3 of face)
             jaw_region = gray[2*h//3:, :]
@@ -363,46 +371,35 @@ class FaceDetector:
             if jaw_region.size > 0 and upper_region.size > 0:
                 jaw_contrast = np.std(jaw_region.astype(float))
                 upper_contrast = np.std(upper_region.astype(float))
-                # Males often have more jaw texture (stubble, stronger jaw)
-                if jaw_contrast > upper_contrast * 1.25:
-                    score += 1.5
-                elif jaw_contrast < upper_contrast * 0.80:
-                    score -= 0.5  # Softened feminine penalty
+                # Males often have stubble/beard texture causing higher contrast
+                if jaw_contrast > upper_contrast * 1.3:
+                    score += 2.0
+                elif jaw_contrast < upper_contrast * 0.9:
+                    score -= 0.8
 
             # 3. Eyebrow region thickness/darkness
             brow_region = gray[h//6:h//4, w//6:5*w//6]
             if brow_region.size > 0:
                 brow_darkness = 255 - np.mean(brow_region)
-                if brow_darkness > 90:
-                    score += 1.5  # Darker/thicker brows = masculine
-                elif brow_darkness < 50:
-                    score -= 1.0  # Lighter brows = feminine
+                if brow_darkness > 85:
+                    score += 1.5
+                elif brow_darkness < 55:
+                    score -= 1.2
 
-            # 4. Skin smoothness
-            # Because we applied GaussianBlur to kill webcam noise, ALL skin is very smooth now. 
-            # We must drastically reduce the penalty for smooth skin, otherwise men are classified as women.
-            center = gray[h//4:3*h//4, w//4:3*w//4]
+            # 4. Skin smoothness (lower 1/2 of face)
+            center = gray[h//2:, w//4:3*w//4]
             if center.size > 0:
                 smoothness = cv2.Laplacian(center, cv2.CV_64F).var()
-                if smoothness < 100:
-                    score -= 0.5  # Only slightly feminine if phenomenally smooth
-                elif smoothness > 400:
-                    score += 1.5  # Definite masculine stubble/texture
+                if smoothness < 80:
+                    score -= 1.0  # Very smooth skin = feminine
+                elif smoothness > 300:
+                    score += 2.0  # Texture/stubble = masculine
 
             # 5. Color features: LAB space
             lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
-            a_mean = np.mean(lab[:, :, 1])  # redness channel
+            a_mean = np.mean(lab[:, :, 1])  # redness
             if a_mean > 138:
-                score -= 0.5  # More reddish/pink undertone = feminine tendency
-
-            # 6. Nose width relative to face
-            nose_region = gray[h//3:2*h//3, w//3:2*w//3]
-            if nose_region.size > 0:
-                nose_edges = cv2.Canny(nose_region, 50, 150)
-                edge_density = np.count_nonzero(nose_edges) / max(nose_region.size, 1)
-                if edge_density > 0.07:
-                    score += 1.0  # More prominent nose features = masculine
-
+                score -= 0.7
 
             return "Male" if score > 0 else "Female"
 

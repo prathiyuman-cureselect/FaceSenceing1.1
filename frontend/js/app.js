@@ -591,7 +591,7 @@ function showResultsScreen() {
                 if (val >= 60 && val <= 100) return { color: '#10b981', status: 'Normal' };
                 return { color: '#ef4444', status: val < 60 ? 'Low' : 'High' };
             case 'SpO2':
-                if (val >= 95) return { color: '#10b981', status: 'Excellent' };
+                if (val >= 95) return { color: '#10b981', status: 'Optimal' };
                 return { color: '#f59e0b', status: 'Low' };
             case 'Hemoglobin':
                 if (val >= 13.5 && val <= 17.5) return { color: '#10b981', status: 'Normal' };
@@ -600,8 +600,8 @@ function showResultsScreen() {
                 if (val < 140) return { color: '#10b981', status: 'Normal' };
                 return { color: '#f59e0b', status: 'Elevated' };
             case 'Wellness Score':
-                if (val >= 7.5) return { color: '#10b981', status: 'Optimal' };
-                return { color: '#ef4444', status: 'Action Needed' };
+                if (val >= 7.5) return { color: '#10b981', status: 'Excellent' };
+                return { color: '#ef4444', status: 'Below Target' };
             default: return { color: '#94a3b8', status: '' };
         }
     }
@@ -609,7 +609,6 @@ function showResultsScreen() {
     const categories = [
         {
             title: "Vital Signs",
-            icon: "🩺",
             items: [
                 { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
                 { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
@@ -619,18 +618,16 @@ function showResultsScreen() {
             ]
         },
         {
-            title: "Bloodless Blood Tests",
-            icon: "�",
+            title: "Bloodless Blood Tests (AI)",
             items: [
                 { icon: '🧪', label: 'Hemoglobin', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
                 { icon: '🍬', label: 'Glucose', value: fmt(v.glucose), unit: 'mg/dL' },
-                { icon: '�', label: 'HbA1c', value: fmt(v.hba1c, 1), unit: '%' },
+                { icon: '💉', label: 'HbA1c', value: fmt(v.hba1c, 1), unit: '%' },
                 { icon: '💧', label: 'Hydration', value: fmt(v.hydration, 1), unit: '/ 10' },
             ]
         },
         {
             title: "Chronic Risk Factors",
-            icon: "⚠️",
             items: [
                 { icon: '⌛', label: 'Cardio Age', value: v.cardio_age || '--', unit: 'Years' },
                 { icon: '🛡️', label: 'Vascular Health', value: fmt(v.vascular_health), unit: '%' },
@@ -640,9 +637,8 @@ function showResultsScreen() {
         },
         {
             title: "Mental Wellness",
-            icon: "🧘",
             items: [
-                { icon: '�', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
+                { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
                 { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%' },
                 { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%' },
                 { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10' },
@@ -650,55 +646,89 @@ function showResultsScreen() {
         }
     ];
 
-    const confidenceColor = confidence >= 80 ? '#10b981' : (confidence >= 50 ? '#fbbf24' : '#ef4444');
+    const confidenceColor = confidence >= 80 ? '#10b981' : (confidence >= 50 ? '#f59e0b' : '#ef4444');
     const estimatedAge = median(state.allAge);
     const genderCounts = {};
     state.allGender.forEach(g => { genderCounts[g] = (genderCounts[g] || 0) + 1; });
-    const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || null;
-    const genderIcon = estimatedGender === 'Male' ? '♂️' : estimatedGender === 'Female' ? '♀️' : '👤';
-    const genderColor = estimatedGender === 'Male' ? '#3b82f6' : '#ec4899';
+    const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || 'Unknown';
+    const genderIcon = estimatedGender === 'Male' ? '♂️' : (estimatedGender === 'Female' ? '♀️' : '👤');
+    const genderColor = estimatedGender === 'Male' ? '#2563eb' : '#db2777';
 
-    let html = `
-        <div class="result-card hero">
-            <div style="text-align: center; flex: 1;">
-                <div class="result-icon">🧬</div>
-                <div class="result-label">AI Profile Estimate</div>
-                <div class="result-value">~${estimatedAge || '--'} <span style="font-size: 1rem; color: #64748b;">Yrs</span></div>
-                <div class="result-unit" style="color: ${genderColor}">${genderIcon} ${estimatedGender || 'Unknown'}</div>
+    const now = new Date();
+    const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+    let innerHTML = `
+        <div class="results-header">
+            <div class="results-header-left">
+                <h2>Diagnostic Report</h2>
+                <div class="results-subtitle">Non-Invasive AI Wellness Analysis</div>
             </div>
-            <div style="width: 1px; height: 80px; background: rgba(255,255,255,0.1);"></div>
-            <div style="text-align: center; flex: 1;">
-                <div class="result-icon">🎯</div>
-                <div class="result-label">Data Accuracy</div>
-                <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
-                <div class="result-unit">${state.goodMeasurements} / ${state.totalMeasurements} Quality Samples</div>
+            <div class="report-metadata">
+                <div><strong>Report ID:</strong> TG-${state.sessionId.toUpperCase()}</div>
+                <div><strong>Date:</strong> ${dateStr}</div>
+                <div><strong>Time:</strong> ${timeStr}</div>
             </div>
         </div>
+
+        <div class="results-grid">
+            <div class="result-card hero">
+                <div style="flex: 1; border-right: 1px solid #e2e8f0; padding-right: 20px;">
+                    <div class="result-label">AI Profile Estimation</div>
+                    <div style="display: flex; align-items: baseline; gap: 10px;">
+                        <span class="result-value">~${estimatedAge || '--'}</span>
+                        <span class="result-unit">Years Old</span>
+                    </div>
+                    <div style="margin-top: 10px; font-weight: 700; color: ${genderColor}">
+                        ${genderIcon} ${estimatedGender}
+                    </div>
+                </div>
+                <div style="flex: 1;">
+                    <div class="result-label">Data Confidence</div>
+                    <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">
+                        Based on ${state.goodMeasurements} high-quality samples
+                    </div>
+                </div>
+            </div>
     `;
 
     categories.forEach(cat => {
-        html += `
-            <div style="grid-column: 1 / -1; margin: 32px 0 16px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 1.5rem;">${cat.icon}</span>
-                <h3 style="margin: 0; font-size: 1.25rem; letter-spacing: 0.05em; color: #94a3b8; text-transform: uppercase;">${cat.title}</h3>
+        innerHTML += `
+            <div style="grid-column: 1 / -1; margin-top: 20px; margin-bottom: 10px;">
+                <h4 style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px;">
+                    ${cat.title}
+                </h4>
             </div>
         `;
-        cat.items.forEach((r, i) => {
-            const info = getHealthMetricInfo(r.value === '--' || r.value.includes('/') ? null : parseFloat(r.value), r.label);
-            html += `
-                <div class="result-card" style="animation-delay: ${0.05 * i}s">
-                    <div class="result-icon">${r.icon}</div>
-                    <div class="result-label">${r.label}</div>
-                    <div class="result-value" style="color: ${info.color === '#94a3b8' ? 'white' : info.color}">${r.value}</div>
-                    <div class="result-unit">${r.unit}</div>
-                    ${info.status ? `<div class="result-status" style="color: ${info.color}; background: ${info.color}15">${info.status}</div>` : ''}
+        cat.items.forEach(item => {
+            const numVal = item.value === '--' || item.value.includes('/') ? null : parseFloat(item.value);
+            const info = getHealthMetricInfo(numVal, item.label);
+            innerHTML += `
+                <div class="result-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <span style="font-size: 1.2rem;">${item.icon}</span>
+                        ${info.status ? `<span class="result-status" style="background: ${info.color}15; color: ${info.color};">${info.status}</span>` : ''}
+                    </div>
+                    <div class="result-label">${item.label}</div>
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <span class="result-value" style="${info.status ? `color: ${info.color}` : ''}">${item.value}</span>
+                        <span class="result-unit">${item.unit}</span>
+                    </div>
                 </div>
             `;
         });
     });
 
-    DOM.resultsGrid.innerHTML = html;
+    innerHTML += `</div>`;
+    DOM.resultsGrid.innerHTML = innerHTML;
     DOM.resultsOverlay.classList.add('visible');
+
+    // Setup Print Button
+    const btnPrint = document.getElementById('btnPrintReport');
+    if (btnPrint) {
+        btnPrint.onclick = () => window.print();
+    }
 }
 
 function resetSession() {
