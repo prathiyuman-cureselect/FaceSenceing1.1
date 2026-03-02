@@ -153,10 +153,10 @@ const App: React.FC = () => {
       next.bufferFill = data.buffer_fill;
       if (data.fps_actual) next.fps = data.fps_actual;
 
-      // Phase switch: face → vitals (Wait until calibration is done on backend)
-      if (next.scanPhase === 'face' && data.vitals && !data.message?.includes('Analyzing Face Profile')) {
+      // Phase switch: face → vitals
+      if (next.scanPhase === 'face' && data.vitals && !data.message?.includes('Scanning Face')) {
         next.scanPhase = 'vitals';
-        next.message = '💓 Sensors locked! Extracting vitals from face...';
+        next.message = '⚡ Optical Lock Achieved. Sensing Physiological Signal...';
       }
 
       // Vitals display
@@ -310,13 +310,14 @@ const App: React.FC = () => {
 
       if (timeLeft <= 0) {
         clearInterval(scanTimerRef.current!);
-        setTimerText('✅ Clinical Scan Complete!');
+        setTimerText('✅ Scan Window Complete!');
         autoCompleteSession();
       } else {
         if (scanStateRef.current.scanPhase === 'vitals') {
           setTimerText(`${currentStep} ${progress}%`);
         } else {
-          setTimerText(`👤 Face Lock: ${progress}%`);
+          // Use backend's fast-tracking message during face lock
+          setTimerText(scanStateRef.current.message || 'Searching for Face...');
         }
       }
     }, 1000);
@@ -547,7 +548,8 @@ const App: React.FC = () => {
   // ─── Derived state for display ─────────────────────────────────────────────
 
   const isScanning =
-    scanState.scanPhase === 'face' || scanState.allHR.length < 5;
+    scanState.isRunning &&
+    (scanState.scanPhase === 'face' || scanState.allHR.length < 3);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

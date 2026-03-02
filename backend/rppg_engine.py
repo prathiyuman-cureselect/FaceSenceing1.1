@@ -59,7 +59,7 @@ class RPPGEngine:
 
         # Calibration & Scanning State
         self._is_calibrating = True
-        self._calibration_frames = 50  # Even faster (1.5 seconds)
+        self._calibration_frames = 35  # Ultra-fast calibration (approx 3-4s at 10fps)
         self._calibration_progress = 0
         self._age_history = []
         self._gender_history = []
@@ -146,7 +146,7 @@ class RPPGEngine:
                     self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
                 else:
                     self._stable_sentiment = "Neutral"
-                result.message = "Face Analyzed. Extracing Vitals..."
+                result.message = "Face Analyzed. Starting Vitals Sensing..."
                 self._face_lost_counter = 0 # Reset lost counter on valid scan phase
         
         self._frames_processed += 1 # Total frames processed (including no face)

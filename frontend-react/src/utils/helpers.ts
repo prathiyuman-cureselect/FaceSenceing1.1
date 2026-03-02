@@ -38,7 +38,7 @@ export function isDataAccurate(
     overallLevel: string,
     isAcceptable: boolean,
 ): boolean {
-    if (state.allHR.length < 120) return false;
+    if (state.allHR.length < 80) return false;
 
     const isQualityHigh =
         isAcceptable && (snrDb > 6 || overallLevel === 'EXCELLENT');
