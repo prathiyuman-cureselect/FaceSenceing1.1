@@ -319,15 +319,17 @@ class SignalProcessor:
         # ── Factor 1: Heart Rate deviation ──
         # Resting baseline. Higher HR strongly correlates with elevated BP. 
         hr_dev = hr - 70.0
-        hr_sys_contrib = hr_dev * 0.6
-        hr_dia_contrib = hr_dev * 0.3
+        hr_sys_contrib = hr_dev * 1.2
+        hr_dia_contrib = hr_dev * 0.6
 
         # ── Factor 2: Pulse Amplitude (AC component) ──
-        # Hypertensive flow creates distinctly harder pulsatile peaks on the face
-        amp_sys_contrib = pulse_amplitude * 8.0
-        amp_dia_contrib = pulse_amplitude * 3.0
+        # Hypertensive subjects exhibit distinctly harder, higher-amplitude pulsatile peaks on facial ROIs.
+        # This is the most critical factor for capturing 160+ mmHg readings.
+        amp_sys_contrib = pulse_amplitude * 25.0
+        amp_dia_contrib = pulse_amplitude * 12.0
 
-        # ── Factor 3: Pulse Wave Variability (beat-to-beat stiffness) ──
+        # ... (Factors 3 & 4 logic remains similar but with higher influence)
+        # Factor 3: Pulse Wave Variability logic...
         pwv_contrib_sys = 0.0
         pwv_contrib_dia = 0.0
         if hr_filtered is not None and len(hr_filtered) > 60:
@@ -341,16 +343,16 @@ class SignalProcessor:
                 peak_mean = np.mean(peaks)
                 if peak_mean > 0:
                     variability = peak_std / peak_mean
-                    pwv_contrib_sys = variability * 20.0
-                    pwv_contrib_dia = variability * 10.0
+                    pwv_contrib_sys = variability * 35.0
+                    pwv_contrib_dia = variability * 18.0
 
         # ── Factor 4: Signal Energy ──
         energy_contrib_sys = 0.0
         energy_contrib_dia = 0.0
         if hr_filtered is not None and len(hr_filtered) > 30:
             signal_energy = np.sum(hr_filtered ** 2) / len(hr_filtered)
-            energy_contrib_sys = min(signal_energy * 12.0, 20.0)
-            energy_contrib_dia = min(signal_energy * 5.0, 10.0)
+            energy_contrib_sys = min(signal_energy * 30.0, 40.0)
+            energy_contrib_dia = min(signal_energy * 15.0, 20.0)
 
         # ── Factor 5: Red Channel Intensity (vasodilation/flushing proxy) ──
         red_contrib_sys = 0.0
@@ -360,10 +362,10 @@ class SignalProcessor:
             green_mean = np.mean(rgb_array[:, 1])
             if green_mean > 0:
                 rg_ratio = red_mean / green_mean
-                # High R/G strongly indicates facial flushing typical of high BP
-                if rg_ratio > 1.05:
-                    red_contrib_sys = (rg_ratio - 1.05) * 30.0
-                    red_contrib_dia = (rg_ratio - 1.05) * 15.0
+                # High R/G strongly indicates facial flushing typical of hypertensive crisis
+                if rg_ratio > 1.04:
+                    red_contrib_sys = (rg_ratio - 1.04) * 60.0
+                    red_contrib_dia = (rg_ratio - 1.04) * 30.0
 
         # ── Combine all factors ──
         sbp = (
