@@ -61,7 +61,7 @@ class FilterConfig:
 class FFTConfig:
     """FFT and peak detection settings."""
     zero_pad_factor: int = 4     # Zero-padding multiplier for FFT
-    peak_prominence: float = 0.05  # Lowered from 0.1 for higher sensitivity
+    peak_prominence: float = 0.01  # Ultra-sensitive for weak/distal signals
     peak_distance_hz: float = 0.3  # Minimum distance between peaks in Hz
 
 

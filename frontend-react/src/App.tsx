@@ -184,8 +184,8 @@ const App: React.FC = () => {
       if (data.estimated_gender) next.allGender = [...next.allGender, data.estimated_gender];
       if (data.estimated_sentiment) next.allSentiment = [...next.allSentiment, data.estimated_sentiment];
 
-      // Accumulate vitals during vitals phase
-      if (next.scanPhase === 'vitals' && data.vitals) {
+      // Accumulate vitals (Proactive capture: sensing starts as soon as backend has data)
+      if (data.vitals) {
         next.totalMeasurements++;
         if (data.quality?.acceptable) next.goodMeasurements++;
 
@@ -309,12 +309,14 @@ const App: React.FC = () => {
       setScanState((prev) => ({ ...prev, timeLeft }));
 
       if (timeLeft <= 0) {
+        console.log("Timer finished, calling autoCompleteSession");
         clearInterval(scanTimerRef.current!);
+        scanTimerRef.current = null;
         setTimerText('✅ Scan Window Complete!');
         autoCompleteSession();
       } else {
-        // Failsafe: if we've been scanning for >10s and still in 'face' phase, force 'vitals'
-        if (scanStateRef.current.scanPhase === 'face' && elapsed > 10) {
+        // Failsafe: if we've been scanning for >8s and still in 'face' phase, force 'vitals'
+        if (scanStateRef.current.scanPhase === 'face' && elapsed > 6) {
           setScanState(prev => ({ ...prev, scanPhase: 'vitals' }));
         }
 
@@ -424,9 +426,9 @@ const App: React.FC = () => {
       setShowResults(true);
     } else {
       const msg = currentState.allHR.length === 0
-        ? "No biometric signal was analyzed. Please ensure your face is well-lit and stay still for the full 60 seconds."
-        : `Only ${currentState.allHR.length} samples were captured. Stay still for longer to get more accurate data.`;
-      alert(`⚠️ SCAN INCOMPLETE\n\n${msg}`);
+        ? "No biometric signal could be extracted from your face. Please ensure you are in a brightly lit room, stay perfectly still, and keep your face centered in the frame for the full 40 seconds."
+        : `We only captured ${currentState.allHR.length} stable data points. For an accurate clinical report, we need a continuous signal flow. Please try once more with better lighting.`;
+      alert(`⚠️ ANALYSIS INTERRUPTED\n\n${msg}`);
       setStartupHidden(false);
     }
   }, [stopFrameCapture, buildResults, stopCamera]);

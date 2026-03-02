@@ -172,12 +172,14 @@ class RPPGEngine:
         all_patches = rois["forehead"] + rois["left_cheek"] + rois["right_cheek"]
         
         if not all_patches:
-            # This line was added by the user's instruction, but it's a local variable
-            # and doesn't affect the face detector's min_face_size.
-            # The actual change for min_face_size was applied in __init__.
-            # Keeping it here as per the explicit instruction, though its effect is null.
-            min_face_size: int = 60  # Minimum face width in pixels (better for mobile)..."
-            return result
+            # ROBUST FALLBACK: If specific sub-ROIs failed, use the core of the face as one large patch
+            x, y, w, h = face_rect
+            face_core = frame[y+int(h*0.3):y+int(h*0.7), x+int(w*0.3):x+int(w*0.7)]
+            if face_core.size > 0:
+                all_patches = [face_core]
+            else:
+                result.message = "Searching for stable skin area..."
+                return result
 
         patch_signals = []
         for patch in all_patches:
