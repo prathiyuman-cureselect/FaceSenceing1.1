@@ -1356,49 +1356,83 @@ video#videoFeed {
   left: 0;
   width: 100%;
   height: 4px;
-  background: linear-gradient(to right, transparent, var(--primary-color), transparent);
-  box-shadow: 0 0 15px var(--primary-color);
-  opacity: 0.7;
-  z-index: 5;
+  background: linear-gradient(to bottom,
+      transparent,
+      var(--primary-color),
+      rgba(16, 185, 129, 0.5),
+      transparent);
+  box-shadow: 0 0 20px var(--primary-color);
+  opacity: 0.8;
+  z-index: 10;
   pointer-events: none;
-  animation: scan-move 3s ease-in-out infinite;
+  animation: scan-move 2.5s ease-in-out infinite;
 }
 
 @keyframes scan-move {
-
-  0%,
-  100% {
+  0% {
     top: 10%;
+    opacity: 0.2;
+  }
+
+  10% {
+    opacity: 1;
   }
 
   50% {
     top: 90%;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 10%;
+    opacity: 0.2;
   }
 }
 
 .face-lock-active {
   position: absolute;
   inset: 0;
-  border: 2px solid transparent;
-  transition: border-color 0.3s ease;
+  border: 1px solid transparent;
+  transition: all 0.5s ease;
   pointer-events: none;
   z-index: 4;
+  overflow: hidden;
 }
 
 .face-detected .face-lock-active {
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.1);
-  animation: pulse-border 2s infinite;
+  border-color: rgba(16, 185, 129, 0.2);
+  background: radial-gradient(circle at center, transparent 30%, rgba(16, 185, 129, 0.05) 100%);
+  box-shadow: inset 0 0 50px rgba(16, 185, 129, 0.1);
+}
+
+.face-detected .face-lock-active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(0deg,
+      transparent,
+      transparent 20px,
+      rgba(16, 185, 129, 0.03) 20px,
+      rgba(16, 185, 129, 0.03) 21px);
+  animation: pulse-border 4s linear infinite;
 }
 
 @keyframes pulse-border {
-
-  0%,
-  100% {
-    opacity: 0.5;
+  0% {
+    opacity: 0.3;
   }
 
   50% {
-    opacity: 1;
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 0.3;
   }
 }

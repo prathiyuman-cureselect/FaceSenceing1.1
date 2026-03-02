@@ -586,7 +586,6 @@ const App: React.FC = () => {
           canvasRef={canvasRef}
           isRunning={scanState.isRunning}
           faceDetected={scanState.faceDetected}
-          faceRect={scanState.faceRect}
           bufferFill={scanState.bufferFill}
           timerText={timerText}
           qualityText={qualityText}

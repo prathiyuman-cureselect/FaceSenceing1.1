@@ -1,12 +1,10 @@
 import React, { memo, useEffect, useRef, useMemo, useCallback } from 'react';
-import { drawFaceOverlay } from '../utils/canvas';
 
 interface VideoSectionProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
     isRunning: boolean;
     faceDetected: boolean;
-    faceRect: [number, number, number, number] | null;
     bufferFill: number;
     timerText: string;
     qualityText: string;
@@ -22,7 +20,6 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
     canvasRef,
     isRunning,
     faceDetected,
-    faceRect,
     bufferFill,
     timerText,
     qualityText,
@@ -34,16 +31,11 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
 }) => {
     const svgRef = useRef<SVGSVGElement | null>(null);
 
-    // Draw face overlay when face rect changes
+    // SVG overlay is now handled via CSS classes on the wrapper
     useEffect(() => {
         if (!svgRef.current) return;
-        if (faceRect) {
-            const [x, y, w, h] = faceRect;
-            drawFaceOverlay(svgRef.current, x, y, w, h);
-        } else {
-            svgRef.current.innerHTML = '';
-        }
-    }, [faceRect]);
+        svgRef.current.innerHTML = '';
+    }, []);
 
     const wrapperClass = useMemo(() => {
         const base = 'video-wrapper';

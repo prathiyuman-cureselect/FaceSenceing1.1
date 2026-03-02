@@ -77,6 +77,10 @@ class RPPGEngine:
         self._prev_gray: Optional[np.ndarray] = None
         self._motion_score: float = 0.0
 
+        # Face Tracking Robustness
+        self._face_lost_counter = 0
+        self._max_face_lost = 15  # ~0.5s grace period
+        
         # Session tracking
         self._frames_processed: int = 0
         self._start_time: float = time.time()
@@ -92,11 +96,23 @@ class RPPGEngine:
 
         # Step 1: High-precision Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
-        result.face_detected = face_rect is not None
+        
+        if face_rect is None:
+            self._face_lost_counter += 1
+            if self._face_lost_counter <= self._max_face_lost:
+                face_rect = self.face_detector._prev_face_rect
+                face_confidence = 0.5 # Reduced confidence during coasting
+                result.face_detected = face_rect is not None
+            else:
+                result.face_detected = False
+        else:
+            self._face_lost_counter = 0
+            result.face_detected = True
+
         result.face_rect = face_rect
 
         if not result.face_detected:
-            result.message = "No face detected. Please position your face in the frame."
+            result.message = "Searching for face... position your head in the frame"
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
             return result
 

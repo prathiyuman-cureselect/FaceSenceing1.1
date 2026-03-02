@@ -221,17 +221,17 @@ export function drawFaceOverlay(
     corners.forEach((d) => {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', d);
-        path.setAttribute('stroke', '#3b82f6');
-        path.setAttribute('stroke-width', '3');
+        path.setAttribute('stroke', '#10b981'); // Emerald
+        path.setAttribute('stroke-width', '2');
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke-linecap', 'round');
         svg.appendChild(path);
     });
 
     const patches = [
-        { px: x + w * 0.3, py: y + h * 0.05, pw: w * 0.4, ph: h * 0.15 },
-        { px: x + w * 0.15, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2 },
-        { px: x + w * 0.65, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2 },
+        { px: x + w * 0.3, py: y + h * 0.05, pw: w * 0.4, ph: h * 0.15 }, // Forehead
+        { px: x + w * 0.15, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2 }, // L Cheek
+        { px: x + w * 0.65, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2 }, // R Cheek
     ];
 
     patches.forEach((p) => {
@@ -240,10 +240,9 @@ export function drawFaceOverlay(
         rect.setAttribute('y', String(p.py));
         rect.setAttribute('width', String(p.pw));
         rect.setAttribute('height', String(p.ph));
-        rect.setAttribute('fill', 'rgba(59, 130, 246, 0.1)');
-        rect.setAttribute('stroke', 'rgba(59, 130, 246, 0.4)');
+        rect.setAttribute('fill', 'rgba(16, 185, 129, 0.05)');
+        rect.setAttribute('stroke', 'rgba(16, 185, 129, 0.2)');
         rect.setAttribute('stroke-width', '1');
-        rect.setAttribute('stroke-dasharray', '2,2');
         svg.appendChild(rect);
     });
 }

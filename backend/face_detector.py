@@ -70,10 +70,32 @@ class FaceDetector:
         if self._use_dnn:
             rect, conf = self._detect_dnn(frame)
         else:
-            rect, conf = self._detect_haar(frame)
+            # Optimize Haar: Enhance contrast for low-light
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            rect, conf = self._detect_haar_optimized(enhanced)
             
         self._last_confidence = conf
         return rect, conf
+
+    def _detect_haar_optimized(self, enhanced_gray: np.ndarray) -> Tuple[Optional[Tuple[int, int, int, int]], float]:
+        """Haar-based face detection with optimized parameters."""
+        faces = self._cascade.detectMultiScale(
+            enhanced_gray,
+            scaleFactor=1.1,
+            minNeighbors=3,
+            minSize=(30, 30)
+        )
+
+        if len(faces) == 0:
+            self._no_face_count += 1
+            return None, 0.0
+
+        self._no_face_count = 0
+        # Pick largest face
+        best_face = max(faces, key=lambda f: f[2] * f[3])
+        return tuple(map(int, best_face)), 0.8  # Fixed confidence for Haar 0.8 if found
 
     def _detect_dnn(
         self, frame: np.ndarray
@@ -222,13 +244,13 @@ class FaceDetector:
         if roi.size == 0:
             return np.array([])
 
-        # Space 1: YCrCb
+        # Space 1: YCrCb (Better for skin across ethnicities)
         ycrcb = cv2.cvtColor(roi, cv2.COLOR_BGR2YCrCb)
-        mask1 = cv2.inRange(ycrcb, (0, 133, 85), (255, 170, 125))
+        mask1 = cv2.inRange(ycrcb, (0, 130, 75), (255, 180, 135))
 
-        # Space 2: HSV
+        # Space 2: HSV (Better for identifying shadows/highlights)
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        mask2 = cv2.inRange(hsv, (0, 30, 60), (20, 150, 255))
+        mask2 = cv2.inRange(hsv, (0, 20, 50), (25, 180, 255))
 
         mask = cv2.bitwise_and(mask1, mask2)
 
