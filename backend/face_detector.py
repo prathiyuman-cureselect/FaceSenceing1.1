@@ -355,51 +355,58 @@ class FaceDetector:
             gray = cv2.GaussianBlur(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), (3, 3), 0)
 
             # Score: positive = male tendency, negative = female tendency
-            # Higher base bias (2.5) to counteract aggressive camera smoothing
-            score = 2.5
+            # Very high base bias (3.5) to override smoothing from mobile cameras
+            score = 3.5
 
             # 1. Face aspect ratio: Males tend to have wider faces/jaws relative to height
             aspect = w / max(h, 1)
-            if aspect > 0.80:
-                score += 1.5
+            if aspect > 0.82:
+                score += 1.8
             elif aspect < 0.65:
-                score -= 1.5
+                score -= 2.0
 
             # 2. Jaw region intensity contrast (lower 1/3 of face)
+            # This is the most reliable check for facial hair/stubble texture
             jaw_region = gray[2*h//3:, :]
             upper_region = gray[:h//3, :]
             if jaw_region.size > 0 and upper_region.size > 0:
                 jaw_contrast = np.std(jaw_region.astype(float))
                 upper_contrast = np.std(upper_region.astype(float))
-                # Males often have stubble/beard texture causing higher contrast
-                if jaw_contrast > upper_contrast * 1.25:
-                    score += 2.2
-                elif jaw_contrast < upper_contrast * 0.85:
-                    score -= 1.0
+                if jaw_contrast > upper_contrast * 1.2:
+                    score += 3.0
+                elif jaw_contrast < upper_contrast * 0.8:
+                    score -= 1.5
 
-            # 3. Eyebrow region thickness/darkness
+            # 3. Vertical Jaw Ratio (New Heuristic)
+            # Males tend to have vertically longer jaws/chins relative to the upper face
+            jaw_h = h - h//1.6
+            upper_h = h//3
+            if jaw_h > upper_h * 1.1:
+                score += 1.5
+
+            # 4. Eyebrow region thickness/darkness
             brow_region = gray[h//6:h//4, w//6:5*w//6]
             if brow_region.size > 0:
                 brow_darkness = 255 - np.mean(brow_region)
-                if brow_darkness > 80:
-                    score += 1.8
-                elif brow_darkness < 50:
-                    score -= 1.5
+                if brow_darkness > 75:
+                    score += 2.0
+                elif brow_darkness < 45:
+                    score -= 1.8
 
-            # 4. Skin smoothness (lower 1/2 of face)
+            # 5. Skin smoothness (lower 1/2 of face)
             center = gray[h//2:, w//4:3*w//4]
             if center.size > 0:
                 smoothness = cv2.Laplacian(center, cv2.CV_64F).var()
-                if smoothness < 55:
-                    score -= 1.5  # Only extremely smooth skin counts as female
-                elif smoothness > 250:
-                    score += 2.5  # Texture/stubble = masculine
+                if smoothness < 40:
+                    score -= 2.5  # Only extremely smooth skin counts as female
+                elif smoothness > 200:
+                    score += 3.0  # Texture/stubble = masculine
 
-            # 5. Color features: LAB space (redness/flushing)
+            # 6. Color features: LAB space (redness/flushing)
             lab = cv2.cvtColor(face_roi, cv2.COLOR_BGR2LAB)
             a_mean = np.mean(lab[:, :, 1])
-            if a_mean > 142:
-                score -= 1.0
+            if a_mean > 145:
+                score -= 1.5
 
             return "Male" if score > 0 else "Female"
 

@@ -882,10 +882,15 @@ function handleMeasurement(data) {
 function updateVitals(vitals) {
     if (!vitals) return;
 
+    // To prevent "complicated show" and "unwanted abnormal data" mentioned by USER,
+    // we hide live numbers during the sensitive calibration/scanning phase.
+    // The accurate results will still be stored in the session state for the FINAL REPORT.
+    const isScanning = state.scanPhase === 'face' || state.allHR.length < 5;
+
     // Heart Rate
     if (vitals.heart_rate !== null && DOM.hrValue) {
-        DOM.hrValue.textContent = vitals.heart_rate.toFixed(0);
-        DOM.hrValue.classList.remove('inactive');
+        DOM.hrValue.textContent = isScanning ? "Sensing..." : vitals.heart_rate.toFixed(0);
+        DOM.hrValue.classList.toggle('inactive', isScanning);
         state.hrHistory.push(vitals.heart_rate);
         if (state.hrHistory.length > CONFIG.SPARKLINE_MAX_POINTS) state.hrHistory.shift();
         drawSparkline(DOM.sparklineHR, state.hrHistory, CONFIG.COLORS.heart, CONFIG.COLORS.heartDim);
@@ -894,37 +899,31 @@ function updateVitals(vitals) {
 
     // Respiratory Rate
     if (vitals.respiratory_rate !== null && DOM.rrValue) {
-        DOM.rrValue.textContent = vitals.respiratory_rate.toFixed(0);
-        DOM.rrValue.classList.remove('inactive');
+        DOM.rrValue.textContent = isScanning ? "Sensing..." : vitals.respiratory_rate.toFixed(0);
+        DOM.rrValue.classList.toggle('inactive', isScanning);
         state.rrHistory.push(vitals.respiratory_rate);
         if (state.rrHistory.length > CONFIG.SPARKLINE_MAX_POINTS) state.rrHistory.shift();
         drawSparkline(DOM.sparklineRR, state.rrHistory, CONFIG.COLORS.breath, CONFIG.COLORS.breathDim);
     }
 
-    // HRV (RMSSD, SDNN, pNN50)
+    // HRV
     if (vitals.hrv_rmssd !== null && DOM.hrvValue) {
-        DOM.hrvValue.textContent = vitals.hrv_rmssd.toFixed(0);
-        DOM.hrvValue.classList.remove('inactive');
-        if (vitals.hrv_sdnn !== null && DOM.sdnnValue) DOM.sdnnValue.textContent = vitals.hrv_sdnn.toFixed(0);
-        if (vitals.hrv_pnn50 !== null && DOM.pnn50Value) DOM.pnn50Value.textContent = vitals.hrv_pnn50.toFixed(0) + '%';
+        DOM.hrvValue.textContent = isScanning ? "---" : vitals.hrv_rmssd.toFixed(0);
+        DOM.hrvValue.classList.toggle('inactive', isScanning);
     }
 
     // SpO2
     const spo2El = document.getElementById('spo2Value');
     if (vitals.spo2_estimate !== null && spo2El) {
-        spo2El.textContent = vitals.spo2_estimate.toFixed(0);
-        spo2El.classList.remove('inactive');
+        spo2El.textContent = isScanning ? "Sensing..." : vitals.spo2_estimate.toFixed(0);
+        spo2El.classList.toggle('inactive', isScanning);
     }
 
     // Blood Pressure
     const bpEl = document.getElementById('bpValue');
     if (vitals.blood_pressure_sys && vitals.blood_pressure_dia && bpEl) {
-        bpEl.textContent = `${vitals.blood_pressure_sys.toFixed(0)}/${vitals.blood_pressure_dia.toFixed(0)}`;
-        bpEl.classList.remove('inactive');
-        const sysEl = document.getElementById('sysValue');
-        const diaEl = document.getElementById('diaValue');
-        if (sysEl) sysEl.textContent = vitals.blood_pressure_sys.toFixed(0);
-        if (diaEl) diaEl.textContent = vitals.blood_pressure_dia.toFixed(0);
+        bpEl.textContent = isScanning ? "Calibrating..." : `${vitals.blood_pressure_sys.toFixed(0)}/${vitals.blood_pressure_dia.toFixed(0)}`;
+        bpEl.classList.toggle('inactive', isScanning);
     }
 
     // Stress & ANS

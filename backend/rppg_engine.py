@@ -237,17 +237,7 @@ class RPPGEngine:
 
     def _pos_algorithm(self, rgb: np.ndarray) -> Optional[np.ndarray]:
         """
-        Plane-Orthogonal-to-Skin (POS) algorithm.
-
-        The POS method projects the temporal RGB signal onto a plane
-        orthogonal to the skin-tone direction, making it robust to
-        motion artifacts and illumination changes.
-
-        Args:
-            rgb: Array of shape (N, 3) with [R, G, B] means per frame
-
-        Returns:
-            Extracted pulse signal or None
+        Plane-Orthogonal-to-Skin (POS) algorithm with Amplitude Preservation.
         """
         n = len(rgb)
         window = self.config.pos_window
@@ -255,51 +245,35 @@ class RPPGEngine:
         if n < window:
             return None
 
-        # Normalize RGB channels
+        # AC/DC Normalization
         mean_rgb = np.mean(rgb, axis=0)
         if np.any(mean_rgb < 1e-6):
             return None
-
         normalized = rgb / mean_rgb
 
-        # POS projection
         pulse = np.zeros(n)
-
         for t in range(window, n):
             segment = normalized[t - window: t]
-
-            # Temporal normalization
             seg_mean = np.mean(segment, axis=0)
             if np.any(seg_mean < 1e-6):
                 continue
             cn = segment / seg_mean
 
-            # POS projection matrix
-            # S1 = G - B, S2 = G + B - 2R
-            s1 = cn[:, 1] - cn[:, 2]       # G - B
+            # Projections
+            s1 = cn[:, 1] - cn[:, 2]                  # G - B
             s2 = cn[:, 1] + cn[:, 2] - 2 * cn[:, 0]  # G + B - 2R
 
-            # Adaptive alpha
             std_s1 = np.std(s1)
             std_s2 = np.std(s2)
-
             if std_s2 < 1e-10:
                 continue
 
             alpha = std_s1 / std_s2
-
-            # Pulse signal
             h = s1 + alpha * s2
-
-            # Overlap-add
-            pulse[t - window: t] += (h - np.mean(h)) / (np.std(h) + 1e-10)
-
-        # Normalize output
-        std = np.std(pulse)
-        if std < 1e-10:
-            return None
-
-        pulse = (pulse - np.mean(pulse)) / std
+            
+            # Overlap-add with partial normalization
+            # We keep the scale of 'h' (which represents the AC/DC pulse strength)
+            pulse[t - window: t] += (h - np.mean(h))
 
         return pulse
 
