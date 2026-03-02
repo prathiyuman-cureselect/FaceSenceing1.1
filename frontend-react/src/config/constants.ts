@@ -14,7 +14,8 @@ export const CONFIG = {
     SPARKLINE_MAX_POINTS: 60,
     SIGNAL_CHART_POINTS: 100,
     SPECTRUM_CHART_POINTS: 100,
-    SCAN_DURATION_SECONDS: 60,
+    SCAN_DURATION_SECONDS: 40,
+    BUFFER_SIZE_FRAMES: 60, // 6 seconds at 10fps
 
     COLORS: {
         heart: '#ef4444',

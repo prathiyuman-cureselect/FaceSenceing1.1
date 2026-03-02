@@ -31,13 +31,13 @@ class ROIConfig:
     cheek_ratio_bottom: float = 0.85
     cheek_ratio_left: float = 0.15
     cheek_ratio_right: float = 0.85
-    min_face_size: int = 80  # Minimum face width in pixels
+    min_face_size: int = 50  # Lowered from 80 for distance sensing
 
 
 @dataclass
 class SignalConfig:
     """Signal processing parameters."""
-    buffer_size: int = 150       # ~15.0 seconds at 10fps
+    buffer_size: int = 60       # Optimized for 40s scan (6.0 seconds at 10fps)
     min_buffer_size: int = 30    # ~3 second minimum to get at least 2-3 clean heartbeats
     pos_window: int = 15         # Temporal window >= 0.5 heartbeat for stable processing
     detrend_lambda: float = 300  # Detrending smoothness parameter
@@ -72,7 +72,7 @@ class QualityConfig:
     sqi_spectral_purity: float = 0.2     # Relaxed from 0.4
     sqi_motion_threshold: float = 20.0   # Slightly more tolerant to minor movement
     sqi_face_confidence: float = 0.5     # Min face detection confidence
-    rejection_window: int = 15            # Give it more time to stabilize (30s) before rejection
+    rejection_window: int = 5            # Faster recovery (5s) before rejection logic kicks in
     min_acceptable_hr: float = 40.0      # Minimum plausible HR
     max_acceptable_hr: float = 200.0     # Maximum plausible HR
     min_acceptable_rr: float = 6.0       # Minimum plausible RR
