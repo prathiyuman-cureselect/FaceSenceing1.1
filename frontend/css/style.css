@@ -1100,266 +1100,220 @@ body::before {
 }
 
 /* ─── Professional Report Layout ──────────────────────────────────── */
-/* ─── Professional Clinical Report Layout ─────────────────────────── */
+/* ─── Premium Clinical Report Document (A4 Feel) ─────────────────── */
 .results-overlay {
-    background: #f1f5f9;
-    /* Professional light gray background */
-    backdrop-filter: blur(10px);
-    padding: 40px 20px;
-    z-index: 1000;
-    overflow-y: auto;
+    background: #f8fafc;
+    /* Professional pale background */
+    backdrop-filter: blur(20px);
+    padding: 60px 20px;
+    z-index: 2000;
 }
 
 .results-content {
-    max-width: 900px;
-    /* Standard vertical paper width */
-    margin: 40px auto;
+    max-width: 850px;
+    /* Precise A4 document proportions */
+    margin: 0 auto;
     background: #ffffff;
-    border-radius: 8px;
-    padding: 60px 80px;
-    /* Generous margins like a real document */
+    /* Crisp White Report Paper */
+    border-radius: 4px;
+    /* Sharper corners for a document feel */
+    padding: 80px 100px;
+    /* Large internal margins */
     color: #1e293b;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.1);
     position: relative;
     font-family: 'Inter', -apple-system, sans-serif;
+    border-top: 8px solid #3b82f6;
+    /* Branding Accent */
 }
 
-/* Document Top Banner */
-.results-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 6px;
-    background: #2563eb;
-    /* Strong professional blue brand color */
-    border-radius: 8px 8px 0 0;
-}
-
+/* Auth Header */
 .results-header {
-    margin-bottom: 40px;
-    border-bottom: 2px solid #e2e8f0;
-    padding-bottom: 24px;
+    margin-bottom: 50px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 30px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
 }
 
-.results-header-left h2 {
-    font-size: 24px;
-    font-weight: 800;
+.results-header h2 {
+    font-family: 'Georgia', serif;
+    /* Authoritative serif heading */
+    font-size: 28px;
+    font-weight: 700;
     color: #0f172a;
+    letter-spacing: -0.02em;
     margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .results-subtitle {
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 600;
-    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 8px;
 }
 
 .report-metadata {
-    text-align: right;
-}
-
-.report-metadata div {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-bottom: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.8;
 }
 
 .report-metadata strong {
-    color: #475569;
+    color: #1e293b;
 }
 
-/* Report Sectioning */
-.results-section-title {
-    font-size: 11px;
+/* Sections */
+#resultsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.report-category-group {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 24px;
+}
+
+.report-category-title {
+    font-size: 12px;
     font-weight: 800;
     color: #3b82f6;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin: 32px 0 16px 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #f1f5f9;
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    justify-content: space-between;
 }
 
-.results-grid {
+/* Compact Grid for Metrics within Category */
+.report-metric-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    /* Two col layout for reports looks cleaner */
     gap: 20px;
 }
 
-/* Hero Section (Aged/Accuracy) */
-.result-card.hero {
-    grid-column: 1 / -1;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 30px;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    border-radius: 12px;
-}
-
-.hero-item {
-    text-align: center;
-}
-
-.hero-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-}
-
-.hero-value {
-    font-size: 32px;
-    font-weight: 800;
-    color: #0f172a;
-}
-
-.hero-sub {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-top: 4px;
-}
-
-/* Standard Metric Cards */
-.result-card {
-    background: #ffffff;
+/* Metric Row Style (Table-like look) */
+.report-metric-item {
+    padding: 18px;
+    background: #fbfcfe;
     border: 1px solid #f1f5f9;
-    padding: 20px;
-    border-radius: 10px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.metric-info-col {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    transition: none;
-    /* Reports shouldn't "hover" interactively like dashboards */
 }
 
-.result-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
-}
-
-.result-icon {
-    font-size: 20px;
-    opacity: 0.8;
-}
-
-.result-status-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 99px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.result-label {
-    font-size: 13px;
+.metric-label {
+    font-size: 12px;
     font-weight: 600;
-    color: #475569;
-    margin-bottom: 4px;
+    color: #64748b;
+    margin-bottom: 2px;
 }
 
-.result-value-row {
+.metric-value-row {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 4px;
 }
 
-.result-value {
-    font-size: 24px;
-    font-weight: 700;
+.metric-value {
+    font-size: 20px;
+    font-weight: 800;
     color: #0f172a;
     font-family: 'JetBrains Mono', monospace;
 }
 
-.result-unit {
-    font-size: 12px;
+.metric-unit {
+    font-size: 11px;
+    font-weight: 600;
     color: #94a3b8;
-    font-weight: 500;
 }
 
-.results-footer {
-    margin-top: 60px;
-    padding-top: 40px;
-    border-top: 1px solid #f1f5f9;
+.metric-status-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
 }
 
-.results-disclaimer {
-    font-size: 12px;
-    color: #94a3b8;
-    line-height: 1.6;
-    text-align: left;
-    max-width: 100%;
-}
-
-.results-actions {
+/* Profile / Accuracy Banner */
+.results-hero-strip {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 40px;
     display: flex;
-    justify-content: flex-end;
-    gap: 16px;
-    margin-top: 32px;
-}
-
-.btn-secondary {
-    background: #f1f5f9;
-    color: #475569;
+    justify-content: space-around;
     border: 1px solid #e2e8f0;
 }
 
-/* ─── Printing ───────────────────────────────────────────────────── */
+.hero-strip-item {
+    text-align: center;
+}
+
+.hero-strip-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.hero-strip-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+/* Footer Section */
+.results-footer {
+    margin-top: 60px;
+    border-top: 1.5px solid #2563eb;
+    padding-top: 30px;
+}
+
+.results-disclaimer {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.8;
+    font-style: italic;
+    margin-bottom: 40px;
+}
+
+/* Printing logic (already in place in app.js handler) */
 @media print {
     body * {
         visibility: hidden;
     }
 
-    .results-overlay,
-    .results-overlay * {
+    #printableReport,
+    #printableReport * {
         visibility: visible;
     }
 
-    .results-overlay {
-        position: fixed;
+    #printableReport {
+        position: absolute;
         left: 0;
         top: 0;
         width: 100%;
-        height: 100%;
-        background: white !important;
-        padding: 0 !important;
-        margin: 0 !important;
+        box-shadow: none;
+        padding: 0;
+        border: none;
     }
 
-    .results-content {
-        box-shadow: none !important;
-        border: none !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-    }
-
-    .results-actions,
-    .results-section-title i {
-        display: none !important;
-    }
-
-    .result-card {
-        page-break-inside: avoid;
-        border: 1px solid #f1f5f9 !important;
+    .results-actions {
+        display: none;
     }
 }
 

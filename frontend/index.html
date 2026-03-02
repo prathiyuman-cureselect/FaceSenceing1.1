@@ -47,29 +47,29 @@
 
     <!-- ═══ Results Overlay ═══ -->
     <div class="results-overlay" id="resultsOverlay">
-        <div class="results-content">
-            <div class="results-header">
-                <h2>📋 Your Vital Signs Report</h2>
-                <p class="results-subtitle">Scan completed · Results below</p>
+        <div class="results-content" id="printableReport">
+            <div id="resultsGrid">
+                <!-- Professionally populated by app.js -->
             </div>
-            <div class="results-grid" id="resultsGrid">
-                <!-- Populated by JS -->
-            </div>
+
             <div class="results-footer">
-                <p class="results-disclaimer">⚠️ These are AI estimations from facial video analysis. Not for clinical
-                    diagnosis. Always consult a healthcare professional.</p>
+                <p class="results-disclaimer">
+                    <strong>Medical Disclaimer:</strong> This diagnostic report is generated using AI facial analysis
+                    (Remote Photoplethysmography).
+                    It is intended for wellness tracking only and does not constitute a clinical diagnosis.
+                    Always consult with a qualified healthcare professional for medical advice.
+                </p>
                 <div class="results-actions">
                     <button class="btn btn-secondary" id="btnPrintReport">
-                        📄 Download Report
+                        📄 Download/Print Report
                     </button>
                     <button class="btn btn-primary btn-start-custom" id="btnScanAgain">
-                        🔬 Scan Again
+                        🔬 New Analysis
                     </button>
                 </div>
             </div>
         </div>
     </div>
-
     <!-- ═══ Top Navigation Bar ═══ -->
     <nav class="top-bar" id="topBar">
         <div class="brand">

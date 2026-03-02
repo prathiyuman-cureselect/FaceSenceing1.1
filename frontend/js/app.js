@@ -585,63 +585,50 @@ function showResultsScreen() {
     }
 
     function getHealthMetricInfo(val, label) {
-        if (val === null || val === undefined) return { color: '#94a3b8', status: '' };
+        if (val === null || val === undefined) return { color: '#64748b', status: '' };
         switch (label) {
             case 'Heart Rate':
                 if (val >= 60 && val <= 100) return { color: '#059669', status: 'Normal' };
-                return { color: '#dc2626', status: val < 60 ? 'Low' : 'High' };
-            case 'SpO2':
+                return { color: '#dc2626', status: val < 60 ? 'Bradycardia' : 'Tachycardia' };
+            case 'Oxygen Saturation':
                 if (val >= 95) return { color: '#059669', status: 'Optimal' };
-                return { color: '#d97706', status: 'Marginal' };
-            case 'Hemoglobin':
+                return { color: '#d97706', status: 'Low' };
+            case 'Hemoglobin (Est)':
                 if (val >= 13.5 && val <= 17.5) return { color: '#059669', status: 'Normal' };
                 return { color: '#dc2626', status: 'Check' };
-            case 'Glucose':
-                if (val < 140) return { color: '#059669', status: 'Normal' };
-                return { color: '#d97706', status: 'Elevated' };
-            case 'Wellness Score':
-                if (val >= 7.5) return { color: '#059669', status: 'Excellent' };
-                return { color: '#dc2626', status: 'Action' };
+            case 'Wellness Quotient':
+                if (val >= 7.5) return { color: '#059669', status: 'High' };
+                return { color: '#dc2626', status: 'Low' };
             default: return { color: '#64748b', status: '' };
         }
     }
 
     const categories = [
         {
-            title: "Observation: Physical Vitals",
+            title: "Vital Parameters",
             items: [
-                { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
-                { icon: '🌬️', label: 'Respiratory Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
-                { icon: '�', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
-                { icon: '⭕', label: 'Oxygen Saturation', value: fmt(v.spo2_estimate), unit: '%' },
-                { icon: '🌡️', label: 'Skin Temperature', value: fmt(v.skin_temp, 1), unit: '°F' },
+                { label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
+                { label: 'Respiratory Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
+                { label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
+                { label: 'Oxygen Saturation', value: fmt(v.spo2_estimate), unit: '%' }
             ]
         },
         {
-            title: "Analysis: Metabolic Markers",
+            title: "Internal Health Markers",
             items: [
-                { icon: '🧪', label: 'Hemoglobin (Est)', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
-                { icon: '🍬', label: 'Glucose Trend', value: fmt(v.glucose), unit: 'mg/dL' },
-                { icon: '💉', label: 'HbA1c (Est)', value: fmt(v.hba1c, 1), unit: '%' },
-                { icon: '💧', label: 'Hydration Level', value: fmt(v.hydration, 1), unit: '/ 10' },
+                { label: 'Hemoglobin (Est)', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
+                { label: 'Glucose Trend', value: fmt(v.glucose), unit: 'mg/dL' },
+                { label: 'Skin Temp', value: fmt(v.skin_temp, 1), unit: '°F' },
+                { label: 'Hydration', value: fmt(v.hydration, 1), unit: '/ 10' }
             ]
         },
         {
-            title: "Risk Assessment: Cardio-Vascular",
+            title: "Cardiovascular Analysis",
             items: [
-                { icon: '⌛', label: 'Cardiovascular Age', value: v.cardio_age || '--', unit: 'Years' },
-                { icon: '🛡️', label: 'Vascular Integrity', value: fmt(v.vascular_health), unit: '%' },
-                { icon: '📈', label: 'Hypertension Risk', value: v.htn_risk, unit: 'Level' },
-                { icon: '🏎️', label: 'Cardiac Index', value: fmt(v.cardiac_index, 2), unit: 'L/min/m²' },
-            ]
-        },
-        {
-            title: "Psychological: ANS Balance",
-            items: [
-                { icon: '🧠', label: 'Stress Benchmark', value: fmt(v.stress_index), unit: 'SI' },
-                { icon: '⚡', label: 'Sympathetic Act.', value: fmt(v.sympathetic_activity), unit: '%' },
-                { icon: '🧘', label: 'Parasympathetic Act.', value: fmt(v.parasympathetic_activity), unit: '%' },
-                { icon: '💚', label: 'Wellness Quotient', value: fmt(v.wellness_score, 1), unit: '/ 10' },
+                { label: 'Cardio Age', value: v.cardio_age || '--', unit: 'Years' },
+                { label: 'Vascular Health', value: fmt(v.vascular_health), unit: '%' },
+                { label: 'Hypertension Risk', value: v.htn_risk, unit: '' },
+                { label: 'Cardiac Index', value: fmt(v.cardiac_index, 2), unit: 'L/min/m²' }
             ]
         }
     ];
@@ -651,74 +638,71 @@ function showResultsScreen() {
     const genderCounts = {};
     state.allGender.forEach(g => { genderCounts[g] = (genderCounts[g] || 0) + 1; });
     const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || 'Unknown';
-    const genderColor = estimatedGender === 'Male' ? '#2563eb' : '#db2777';
 
     const now = new Date();
     const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-    let innerHTML = `
+    let docHTML = `
         <div class="results-header">
-            <div class="results-header-left">
-                <h2>Health Diagnostic Report</h2>
-                <div class="results-subtitle">Personal AI-Assisted Assessment</div>
+            <div>
+                <h2>Physiological Profile</h2>
+                <div class="results-subtitle">AI-Driven Vital Sign Assessment</div>
             </div>
             <div class="report-metadata">
-                <div><strong>CERTIFICATE NO:</strong> TG-${state.sessionId.toUpperCase()}</div>
-                <div><strong>ISSUED DATE:</strong> ${dateStr}</div>
-                <div><strong>TIMESTAMP:</strong> ${timeStr}</div>
+                <div><strong>Ref:</strong> TG-${state.sessionId.toUpperCase()}</div>
+                <div><strong>Date:</strong> ${dateStr}</div>
+                <div><strong>Time:</strong> ${timeStr}</div>
             </div>
         </div>
 
-        <div class="results-grid">
-            <div class="result-card hero">
-                <div class="hero-item">
-                    <div class="hero-label">Subject Identification</div>
-                    <div class="hero-value">${estimatedGender}</div>
-                    <div class="hero-sub">Gender Estimation</div>
-                </div>
-                <div style="width: 1px; height: 40px; background: #e2e8f0;"></div>
-                <div class="hero-item">
-                    <div class="hero-label">Estimated Age</div>
-                    <div class="hero-value">~${estimatedAge || '--'}</div>
-                    <div class="hero-sub">Years (Biological Profile)</div>
-                </div>
-                <div style="width: 1px; height: 40px; background: #e2e8f0;"></div>
-                <div class="hero-item">
-                    <div class="hero-label">Data Accuracy</div>
-                    <div class="hero-value" style="color: ${confidenceColor}">${confidence}%</div>
-                    <div class="hero-sub">${state.goodMeasurements} / ${state.totalMeasurements} samples</div>
-                </div>
+        <div class="results-hero-strip">
+            <div class="hero-strip-item">
+                <div class="hero-strip-label">Subject Gender</div>
+                <div class="hero-strip-value">${estimatedGender}</div>
             </div>
+            <div style="width: 1px; background: #e2e8f0;"></div>
+            <div class="hero-strip-item">
+                <div class="hero-strip-label">Clinical Age Est.</div>
+                <div class="hero-strip-value">${estimatedAge || '--'} yrs</div>
+            </div>
+            <div style="width: 1px; background: #e2e8f0;"></div>
+            <div class="hero-strip-item">
+                <div class="hero-strip-label">Data Fidelity</div>
+                <div class="hero-strip-value" style="color: ${confidenceColor}">${confidence}%</div>
+            </div>
+        </div>
+
+        <div id="resultsGrid">
     `;
 
     categories.forEach(cat => {
-        innerHTML += `
-            <div style="grid-column: 1 / -1;" class="results-section-title">
-                ${cat.title}
-            </div>
+        docHTML += `
+            <div class="report-category-group">
+                <div class="report-category-title">${cat.title}</div>
+                <div class="report-metric-grid">
         `;
         cat.items.forEach(item => {
             const numVal = item.value === '--' || item.value.includes('/') ? null : parseFloat(item.value);
             const info = getHealthMetricInfo(numVal, item.label);
-            innerHTML += `
-                <div class="result-card">
-                    <div class="result-header-row">
-                        <span class="result-icon">${item.icon}</span>
-                        ${info.status ? `<span class="result-status-badge" style="background: ${info.color}15; color: ${info.color};">${info.status}</span>` : ''}
+            docHTML += `
+                <div class="report-metric-item">
+                    <div class="metric-info-col">
+                        <span class="metric-label">${item.label}</span>
+                        <div class="metric-value-row">
+                            <span class="metric-value">${item.value}</span>
+                            <span class="metric-unit">${item.unit}</span>
+                        </div>
                     </div>
-                    <div class="result-label">${item.label}</div>
-                    <div class="result-value-row">
-                        <span class="result-value" style="${info.status ? `color: ${info.color}` : ''}">${item.value}</span>
-                        <span class="result-unit">${item.unit}</span>
-                    </div>
+                    ${info.status ? `<span class="metric-status-badge" style="background: ${info.color}15; color: ${info.color};">${info.status}</span>` : ''}
                 </div>
             `;
         });
+        docHTML += `</div></div>`;
     });
 
-    innerHTML += `</div>`;
-    DOM.resultsGrid.innerHTML = innerHTML;
+    docHTML += `</div>`;
+    DOM.resultsGrid.innerHTML = docHTML;
     DOM.resultsOverlay.classList.add('visible');
 
     // Attach print handler
