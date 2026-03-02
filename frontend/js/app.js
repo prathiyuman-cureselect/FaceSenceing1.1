@@ -489,7 +489,14 @@ function stopFrameCapture() {
 async function startSession() {
     if (state.isRunning) return;
 
-    // Provide high-fidelity feedback on the button
+    // Protocol Check (Strict)
+    if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+        const httpsUrl = window.location.href.replace('http:', 'https:');
+        alert("🛡️ SECURE CONTEXT REQUIRED\n\nTo access your camera, you MUST use the secure HTTPS link.\n\nRedirecting you now...");
+        window.location.href = httpsUrl;
+        return;
+    }
+
     const originalBtnText = DOM.btnStart.textContent;
     DOM.btnStart.disabled = true;
     DOM.btnStart.textContent = "🔓 ALLOW CAMERA ACCESS...";
@@ -505,17 +512,14 @@ async function startSession() {
             return;
         }
 
-        // Camera is OK! 
-        // INSTANT TRANSITION: Hide the home page overlay immediately 
-        // to show the scanning dashboard as per USER request.
+        // Hide home page overlay
         DOM.startupOverlay.classList.add('hidden');
 
-        // Start Local UI "Scanning" state before WS even connects
-        // so it feels absolutely instant.
+        // Start Local UI state
         if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
-        if (DOM.timerText) DOM.timerText.textContent = "🔬 INITIALIZING AI...";
+        if (DOM.timerText) DOM.timerText.textContent = "INITIALIZING AI...";
 
-        // Comprehensive state reset for ALL accumulation arrays
+        // Comprehensive state reset
         const accumulationKeys = [
             'allHR', 'allRR', 'allSys', 'allDia', 'allSpo2', 'allTemp', 'allHRV',
             'allSDNN', 'allPNN50', 'allStress', 'allLFHF', 'allPI',
@@ -529,15 +533,14 @@ async function startSession() {
         state.goodMeasurements = 0;
         state.totalMeasurements = 0;
 
-        // Initiate backend handshake
         connectWebSocket();
     } catch (err) {
-        console.error("Session start failed:", err);
+        console.error("Session start error:", err);
         state.isRunning = false;
         DOM.btnStart.disabled = false;
         DOM.btnStart.textContent = originalBtnText;
         DOM.startupOverlay.classList.remove('hidden');
-        alert("Startup failed. Please check camera settings.");
+        alert(`Startup Failed: ${err.name} - ${err.message}\n\nPlease ensure no other app is using your camera.`);
     }
 }
 
