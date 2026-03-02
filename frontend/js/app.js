@@ -489,10 +489,10 @@ function stopFrameCapture() {
 async function startSession() {
     if (state.isRunning) return;
 
-    // Provide immediate feedback on the button
+    // Provide high-fidelity feedback on the button
     const originalBtnText = DOM.btnStart.textContent;
     DOM.btnStart.disabled = true;
-    DOM.btnStart.textContent = "⌛ Initializing Camera...";
+    DOM.btnStart.textContent = "🔓 ALLOW CAMERA ACCESS...";
 
     state.isRunning = true;
 
@@ -505,9 +505,15 @@ async function startSession() {
             return;
         }
 
-        // Camera is OK, show the dashboard immediately to improve perceived speed
-        DOM.btnStart.textContent = "🔌 Connecting to Server...";
+        // Camera is OK! 
+        // INSTANT TRANSITION: Hide the home page overlay immediately 
+        // to show the scanning dashboard as per USER request.
         DOM.startupOverlay.classList.add('hidden');
+
+        // Start Local UI "Scanning" state before WS even connects
+        // so it feels absolutely instant.
+        if (DOM.timerChip) DOM.timerChip.style.display = 'flex';
+        if (DOM.timerText) DOM.timerText.textContent = "🔬 INITIALIZING AI...";
 
         // Comprehensive state reset for ALL accumulation arrays
         const accumulationKeys = [
@@ -523,6 +529,7 @@ async function startSession() {
         state.goodMeasurements = 0;
         state.totalMeasurements = 0;
 
+        // Initiate backend handshake
         connectWebSocket();
     } catch (err) {
         console.error("Session start failed:", err);
@@ -530,7 +537,7 @@ async function startSession() {
         DOM.btnStart.disabled = false;
         DOM.btnStart.textContent = originalBtnText;
         DOM.startupOverlay.classList.remove('hidden');
-        alert("Startup failed. Please check your camera permissions.");
+        alert("Startup failed. Please check camera settings.");
     }
 }
 
