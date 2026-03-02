@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { drawSignalChart, drawSpectrumChart, resizeCanvas } from '../utils/canvas';
 
 interface ChartsSectionProps {
@@ -7,7 +7,7 @@ interface ChartsSectionProps {
     spectrumFreqs: number[];
 }
 
-const ChartsSection: React.FC<ChartsSectionProps> = ({
+const ChartsSection: React.FC<ChartsSectionProps> = memo(({
     signalData,
     spectrumData,
     spectrumFreqs,
@@ -26,7 +26,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
         return () => window.removeEventListener('resize', resize);
     }, []);
 
-    // Draw signal chart
+    // Draw signal chart (throttled by data updates)
     useEffect(() => {
         if (signalCanvasRef.current && signalData.length > 1) {
             drawSignalChart(signalCanvasRef.current, signalData);
@@ -77,6 +77,8 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({
             </div>
         </div>
     );
-};
+});
+
+ChartsSection.displayName = 'ChartsSection';
 
 export default ChartsSection;

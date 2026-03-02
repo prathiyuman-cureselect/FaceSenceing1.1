@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 interface TopNavProps {
     fps: number;
@@ -6,7 +6,12 @@ interface TopNavProps {
     sessionId: string | null;
 }
 
-const TopNav: React.FC<TopNavProps> = ({ fps, connected, sessionId }) => {
+const TopNav: React.FC<TopNavProps> = memo(({ fps, connected, sessionId }) => {
+    // Sanitize sessionId for display — prevent any injection
+    const safeSessionId = sessionId
+        ? sessionId.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 16)
+        : null;
+
     return (
         <nav className="top-bar" role="navigation" aria-label="Application toolbar">
             <div className="brand">
@@ -35,8 +40,8 @@ const TopNav: React.FC<TopNavProps> = ({ fps, connected, sessionId }) => {
                     />
                     <span>
                         {connected
-                            ? sessionId
-                                ? `Session: ${sessionId}`
+                            ? safeSessionId
+                                ? `Session: ${safeSessionId}`
                                 : 'Connecting...'
                             : 'Disconnected'}
                     </span>
@@ -44,6 +49,8 @@ const TopNav: React.FC<TopNavProps> = ({ fps, connected, sessionId }) => {
             </div>
         </nav>
     );
-};
+});
+
+TopNav.displayName = 'TopNav';
 
 export default TopNav;

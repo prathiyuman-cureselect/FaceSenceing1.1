@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef, useMemo, useCallback } from 'react';
 import { drawFaceOverlay } from '../utils/canvas';
 
 interface VideoSectionProps {
@@ -16,7 +16,7 @@ interface VideoSectionProps {
     onReset: () => void;
 }
 
-const VideoSection: React.FC<VideoSectionProps> = ({
+const VideoSection: React.FC<VideoSectionProps> = memo(({
     videoRef,
     canvasRef,
     isRunning,
@@ -43,20 +43,29 @@ const VideoSection: React.FC<VideoSectionProps> = ({
         }
     }, [faceRect]);
 
-    const wrapperClass = `video-wrapper ${faceDetected ? 'face-detected' : isRunning ? 'no-face' : ''}`;
+    const wrapperClass = useMemo(() => {
+        const base = 'video-wrapper';
+        if (faceDetected) return `${base} face-detected`;
+        if (isRunning) return `${base} no-face`;
+        return base;
+    }, [faceDetected, isRunning]);
 
-    const genderIcon =
-        estimatedGender === 'Male'
-            ? '♂️'
-            : estimatedGender === 'Female'
-                ? '♀️'
-                : '';
+    const genderIcon = useMemo(() => {
+        if (estimatedGender === 'Male') return '♂️';
+        if (estimatedGender === 'Female') return '♀️';
+        return '';
+    }, [estimatedGender]);
+
+    const clampedBufferFill = useMemo(
+        () => Math.max(0, Math.min(100, bufferFill)),
+        [bufferFill],
+    );
+
+    const handleStop = useCallback(() => onStop(), [onStop]);
+    const handleReset = useCallback(() => onReset(), [onReset]);
 
     return (
-        <section
-            className="card video-section"
-            aria-label="Live camera feed"
-        >
+        <section className="card video-section" aria-label="Live camera feed">
             <div className="card-header">
                 <span className="card-title">
                     <span aria-hidden="true">📹</span> Live Camera Feed
@@ -65,7 +74,7 @@ const VideoSection: React.FC<VideoSectionProps> = ({
                     <button
                         className="btn btn-ghost"
                         id="btnReset"
-                        onClick={onReset}
+                        onClick={handleReset}
                         title="Reset signal buffers"
                         aria-label="Reset signal buffers"
                     >
@@ -74,7 +83,7 @@ const VideoSection: React.FC<VideoSectionProps> = ({
                     <button
                         className="btn btn-danger"
                         id="btnStop"
-                        onClick={onStop}
+                        onClick={handleStop}
                         title="Stop analysis"
                         aria-label="Stop analysis"
                     >
@@ -137,14 +146,22 @@ const VideoSection: React.FC<VideoSectionProps> = ({
             </div>
 
             {/* Buffer progress */}
-            <div className="buffer-bar" role="progressbar" aria-valuenow={bufferFill} aria-valuemin={0} aria-valuemax={100}>
-                <div className="buffer-fill" style={{ width: `${bufferFill}%` }} />
+            <div
+                className="buffer-bar"
+                role="progressbar"
+                aria-valuenow={clampedBufferFill}
+                aria-valuemin={0}
+                aria-valuemax={100}
+            >
+                <div className="buffer-fill" style={{ width: `${clampedBufferFill}%` }} />
             </div>
             <div className="buffer-label" aria-live="polite">
-                Buffer: {Math.round(bufferFill)}%
+                Buffer: {Math.round(clampedBufferFill)}%
             </div>
         </section>
     );
-};
+});
+
+VideoSection.displayName = 'VideoSection';
 
 export default VideoSection;

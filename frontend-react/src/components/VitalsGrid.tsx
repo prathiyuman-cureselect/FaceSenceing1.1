@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef, useMemo } from 'react';
 import type { VitalSigns } from '../types';
 import { drawSparkline, resizeCanvas } from '../utils/canvas';
 import { CONFIG } from '../config/constants';
@@ -21,7 +21,7 @@ interface VitalCardProps {
     children?: React.ReactNode;
 }
 
-const VitalCard: React.FC<VitalCardProps> = ({
+const VitalCard: React.FC<VitalCardProps> = memo(({
     className,
     value,
     unit,
@@ -37,11 +37,22 @@ const VitalCard: React.FC<VitalCardProps> = ({
         <span className="vital-unit">{unit}</span>
         {children}
     </div>
-);
+));
+
+VitalCard.displayName = 'VitalCard';
+
+// ─── Format helper ────────────────────────────────────────────────────────────
+
+function fmt(val: number | null | undefined, dec = 0): string {
+    if (val === null || val === undefined) return '--';
+    const num = Number(val);
+    if (!Number.isFinite(num)) return '--';
+    return num.toFixed(dec);
+}
 
 // ─── Main Grid ────────────────────────────────────────────────────────────────
 
-const VitalsGrid: React.FC<VitalsGridProps> = ({
+const VitalsGrid: React.FC<VitalsGridProps> = memo(({
     vitals,
     hrHistory,
     rrHistory,
@@ -84,65 +95,59 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
         }
     }, [rrHistory]);
 
-    // ─── Format helpers ────────────────────────────────────────────────────────
-    const fmt = (val: number | null | undefined, dec = 0) =>
-        val !== null && val !== undefined ? Number(val).toFixed(dec) : '--';
+    // ─── Derived values ─────────────────────────────────────────────────────────
+    const {
+        hr, rr, hrv, sdnn, pnn50, spo2, sys, dia, temp,
+        pi, stress, lfhf, symp, parasymp, prq, wellness,
+        balanceText, balanceColor, wellnessColor, stressColor,
+        sensing, calibrating,
+    } = useMemo(() => {
+        const _hr = vitals?.heart_rate ?? null;
+        const _rr = vitals?.respiratory_rate ?? null;
+        const _hrv = vitals?.hrv_rmssd ?? null;
+        const _sdnn = vitals?.hrv_sdnn ?? null;
+        const _pnn50 = vitals?.hrv_pnn50 ?? null;
+        const _spo2 = vitals?.spo2_estimate ?? null;
+        const _sys = vitals?.blood_pressure_sys ?? null;
+        const _dia = vitals?.blood_pressure_dia ?? null;
+        const _temp = vitals?.skin_temp ?? null;
+        const _pi = vitals?.perfusion_index ?? null;
+        const _stress = vitals?.stress_index ?? null;
+        const _lfhf = vitals?.lf_hf_ratio ?? null;
+        const _symp = vitals?.sympathetic_activity ?? null;
+        const _parasymp = vitals?.parasympathetic_activity ?? null;
+        const _prq = vitals?.prq ?? null;
+        const _wellness = vitals?.wellness_score ?? null;
 
-    const sensing = isScanning ? 'Sensing...' : undefined;
-    const calibrating = isScanning ? 'Calibrating...' : undefined;
+        let _balanceText = '--';
+        let _balanceColor: string | undefined;
+        if (_lfhf !== null) {
+            if (_lfhf > 2.0) { _balanceText = 'Sympathetic'; _balanceColor = '#f87171'; }
+            else if (_lfhf < 0.5) { _balanceText = 'Parasymp.'; _balanceColor = '#60a5fa'; }
+            else { _balanceText = 'Balanced'; _balanceColor = '#10b981'; }
+        }
 
-    const hr = vitals?.heart_rate;
-    const rr = vitals?.respiratory_rate;
-    const hrv = vitals?.hrv_rmssd;
-    const sdnn = vitals?.hrv_sdnn;
-    const pnn50 = vitals?.hrv_pnn50;
-    const spo2 = vitals?.spo2_estimate;
-    const sys = vitals?.blood_pressure_sys;
-    const dia = vitals?.blood_pressure_dia;
-    const temp = vitals?.skin_temp;
-    const pi = vitals?.perfusion_index;
-    const stress = vitals?.stress_index;
-    const lfhf = vitals?.lf_hf_ratio;
-    const symp = vitals?.sympathetic_activity;
-    const parasymp = vitals?.parasympathetic_activity;
-    const prq = vitals?.prq;
-    const wellness = vitals?.wellness_score;
+        let _wellnessColor: string | undefined;
+        if (_wellness !== null) {
+            _wellnessColor = _wellness >= 7 ? '#34d399' : _wellness >= 4 ? '#fbbf24' : '#ef4444';
+        }
 
-    const balanceText =
-        lfhf !== null && lfhf !== undefined
-            ? lfhf > 2.0
-                ? 'Sympathetic'
-                : lfhf < 0.5
-                    ? 'Parasymp.'
-                    : 'Balanced'
-            : '--';
+        let _stressColor: string | undefined;
+        if (_stress !== null) {
+            _stressColor = _stress > 500 ? '#ef4444' : _stress > 150 ? '#f59e0b' : '#10b981';
+        }
 
-    const balanceColor =
-        lfhf !== null && lfhf !== undefined
-            ? lfhf > 2.0
-                ? '#f87171'
-                : lfhf < 0.5
-                    ? '#60a5fa'
-                    : '#10b981'
-            : undefined;
-
-    const wellnessColor =
-        wellness !== null && wellness !== undefined
-            ? wellness >= 7
-                ? '#34d399'
-                : wellness >= 4
-                    ? '#fbbf24'
-                    : '#ef4444'
-            : undefined;
-
-    const stressColor =
-        stress !== null && stress !== undefined
-            ? stress > 500
-                ? '#ef4444'
-                : stress > 150
-                    ? '#f59e0b'
-                    : '#10b981'
-            : undefined;
+        return {
+            hr: _hr, rr: _rr, hrv: _hrv, sdnn: _sdnn, pnn50: _pnn50,
+            spo2: _spo2, sys: _sys, dia: _dia, temp: _temp, pi: _pi,
+            stress: _stress, lfhf: _lfhf, symp: _symp, parasymp: _parasymp,
+            prq: _prq, wellness: _wellness,
+            balanceText: _balanceText, balanceColor: _balanceColor,
+            wellnessColor: _wellnessColor, stressColor: _stressColor,
+            sensing: isScanning ? 'Sensing...' : undefined,
+            calibrating: isScanning ? 'Calibrating...' : undefined,
+        };
+    }, [vitals, isScanning]);
 
     return (
         <section className="vitals-grid" aria-label="Vital signs">
@@ -150,7 +155,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Heart Rate */}
             <VitalCard
                 className="hr"
-                value={sensing ?? (hr !== null && hr !== undefined ? fmt(hr) : '--')}
+                value={sensing ?? (hr !== null ? fmt(hr) : '--')}
                 unit="BPM"
                 inactive={isScanning || hr === null}
             >
@@ -162,7 +167,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Respiratory Rate */}
             <VitalCard
                 className="rr"
-                value={sensing ?? (rr !== null && rr !== undefined ? fmt(rr) : '--')}
+                value={sensing ?? (rr !== null ? fmt(rr) : '--')}
                 unit="br/min"
                 inactive={isScanning || rr === null}
             >
@@ -223,14 +228,14 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Temperature */}
             <VitalCard
                 className="temp"
-                value={temp !== null && temp !== undefined ? fmt(temp, 1) : '--'}
+                value={temp !== null ? fmt(temp, 1) : '--'}
                 unit="°F"
                 inactive={!temp}
             >
                 <div className="hrv-detail-row">
                     <div>
                         <div className="hrv-metric-label">Perfusion Idx</div>
-                        <div className="hrv-metric-value">{pi !== null && pi !== undefined ? fmt(pi, 1) : '--'}</div>
+                        <div className="hrv-metric-value">{pi !== null ? fmt(pi, 1) : '--'}</div>
                     </div>
                 </div>
             </VitalCard>
@@ -238,7 +243,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Stress & ANS */}
             <VitalCard
                 className="stress"
-                value={stress !== null && stress !== undefined ? fmt(stress) : '--'}
+                value={stress !== null ? fmt(stress) : '--'}
                 unit="Stress Index"
                 inactive={stress === null}
             >
@@ -246,7 +251,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
                     <div>
                         <div className="hrv-metric-label">LF/HF</div>
                         <div className="hrv-metric-value">
-                            {lfhf !== null && lfhf !== undefined ? fmt(lfhf, 2) : '--'}
+                            {lfhf !== null ? fmt(lfhf, 2) : '--'}
                         </div>
                     </div>
                     <div>
@@ -259,7 +264,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
                         </div>
                     </div>
                 </div>
-                {stress !== null && stress !== undefined && (
+                {stress !== null && (
                     <div
                         style={{
                             position: 'absolute',
@@ -277,7 +282,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             <VitalCard
                 className="sympathetic"
                 label="⚡ Sympathetic"
-                value={symp !== null && symp !== undefined ? fmt(symp) : '--'}
+                value={symp !== null ? fmt(symp) : '--'}
                 unit="% Activity"
                 inactive={symp === null}
             />
@@ -285,7 +290,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Parasympathetic */}
             <VitalCard
                 className="parasympathetic"
-                value={parasymp !== null && parasymp !== undefined ? fmt(parasymp) : '--'}
+                value={parasymp !== null ? fmt(parasymp) : '--'}
                 unit="% Activity"
                 inactive={parasymp === null}
             />
@@ -293,7 +298,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* PRQ */}
             <VitalCard
                 className="prq"
-                value={prq !== null && prq !== undefined ? fmt(prq, 1) : '--'}
+                value={prq !== null ? fmt(prq, 1) : '--'}
                 unit="Recovery Quotient"
                 inactive={prq === null}
             />
@@ -301,11 +306,11 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
             {/* Wellness */}
             <VitalCard
                 className="wellness"
-                value={wellness !== null && wellness !== undefined ? fmt(wellness, 1) : '--'}
+                value={wellness !== null ? fmt(wellness, 1) : '--'}
                 unit="/ 10"
                 inactive={wellness === null}
             >
-                {wellness !== null && wellness !== undefined && (
+                {wellness !== null && (
                     <div
                         style={{ color: wellnessColor, fontSize: '0.7rem', marginTop: 4, fontWeight: 600 }}
                     >
@@ -316,6 +321,8 @@ const VitalsGrid: React.FC<VitalsGridProps> = ({
 
         </section>
     );
-};
+});
+
+VitalsGrid.displayName = 'VitalsGrid';
 
 export default VitalsGrid;

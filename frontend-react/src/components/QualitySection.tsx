@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import type { SignalQuality } from '../types';
 import { getQualityColor } from '../utils/helpers';
 
@@ -15,7 +15,7 @@ interface RingProps {
     displayValue: string;
 }
 
-const QualityRing: React.FC<RingProps> = ({
+const QualityRing: React.FC<RingProps> = memo(({
     label,
     unit,
     percentage,
@@ -46,16 +46,28 @@ const QualityRing: React.FC<RingProps> = ({
             <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{unit}</div>
         </div>
     );
-};
+});
 
-const QualitySection: React.FC<QualitySectionProps> = ({ quality }) => {
-    const level = quality?.level?.toLowerCase() ?? 'rejected';
-    const levelUpper = quality?.level?.toUpperCase() ?? 'WAITING';
+QualityRing.displayName = 'QualityRing';
 
-    const snrPct = quality ? Math.min(Math.max(quality.snr_db / 10, 0), 1) : 0;
-    const spectralPct = quality?.spectral_purity ?? 0;
-    const motionPct = quality ? Math.max(0, 1 - quality.motion_score / 30) : 0;
-    const facePct = quality?.face_confidence ?? 0;
+const QualitySection: React.FC<QualitySectionProps> = memo(({ quality }) => {
+    const { level, levelUpper, snrPct, spectralPct, motionPct, facePct } = useMemo(() => {
+        const _level = quality?.level?.toLowerCase() ?? 'rejected';
+        const _levelUpper = quality?.level?.toUpperCase() ?? 'WAITING';
+        const _snrPct = quality ? Math.min(Math.max(quality.snr_db / 10, 0), 1) : 0;
+        const _spectralPct = quality?.spectral_purity ?? 0;
+        const _motionPct = quality ? Math.max(0, 1 - quality.motion_score / 30) : 0;
+        const _facePct = quality?.face_confidence ?? 0;
+
+        return {
+            level: _level,
+            levelUpper: _levelUpper,
+            snrPct: _snrPct,
+            spectralPct: _spectralPct,
+            motionPct: _motionPct,
+            facePct: _facePct,
+        };
+    }, [quality]);
 
     return (
         <section className="card quality-section" aria-label="Signal quality index">
@@ -100,6 +112,8 @@ const QualitySection: React.FC<QualitySectionProps> = ({ quality }) => {
             </div>
         </section>
     );
-};
+});
+
+QualitySection.displayName = 'QualitySection';
 
 export default QualitySection;

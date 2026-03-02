@@ -520,6 +520,16 @@ const App: React.FC = () => {
     setScanState(initialState());
   }, []);
 
+  // ─── Auto-start on mount ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    // Small delay to ensure the UI has settled
+    const timer = setTimeout(() => {
+      startSession();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [startSession]);
+
   // ─── Cleanup on unmount ────────────────────────────────────────────────────
 
   useEffect(() => {

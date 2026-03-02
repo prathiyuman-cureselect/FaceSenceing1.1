@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 
 interface StartupOverlayProps {
     hidden: boolean;
@@ -15,13 +15,17 @@ const FEATURES = [
     'Wellness',
     'HRV',
     'Hemoglobin',
-];
+] as const;
 
-const StartupOverlay: React.FC<StartupOverlayProps> = ({
+const StartupOverlay: React.FC<StartupOverlayProps> = memo(({
     hidden,
     loading,
     onStart,
 }) => {
+    const handleStart = useCallback(() => {
+        if (!loading) onStart();
+    }, [loading, onStart]);
+
     return (
         <div
             className={`startup-overlay ${hidden ? 'hidden' : ''}`}
@@ -36,6 +40,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({
                         src="/asserts/Images/logo.png"
                         alt="TeleGaruda AI Logo"
                         className="startup-logo"
+                        loading="lazy"
                         onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                         }}
@@ -63,12 +68,19 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({
                 <button
                     className="btn btn-primary btn-start"
                     id="btnStart"
-                    onClick={onStart}
+                    onClick={handleStart}
                     disabled={loading}
                     aria-busy={loading}
-                    aria-label={loading ? 'Initializing camera…' : 'Start 40-second scan'}
+                    aria-label={loading ? 'Requesting camera access...' : 'Start 40-second scan'}
                 >
-                    {loading ? '🔓 Requesting Camera…' : '🫀 Start Scan (40 seconds)'}
+                    {loading ? (
+                        <>
+                            <span className="spinner" aria-hidden="true">🔄</span>
+                            Requesting Camera Access...
+                        </>
+                    ) : (
+                        '🫀 Grant Permission to Start'
+                    )}
                 </button>
 
                 <p className="startup-disclaimer">
@@ -77,6 +89,8 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({
             </div>
         </div>
     );
-};
+});
+
+StartupOverlay.displayName = 'StartupOverlay';
 
 export default StartupOverlay;

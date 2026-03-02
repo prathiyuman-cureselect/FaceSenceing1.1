@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import type { FinalResults } from '../types';
 import { fmt } from '../utils/helpers';
 
@@ -43,23 +43,97 @@ function getHealthInfo(
     }
 }
 
-const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
+const ResultsOverlay: React.FC<ResultsOverlayProps> = memo(({
     results,
     visible,
     onScanAgain,
 }) => {
-    if (!results) return null;
+    const handlePrint = useCallback(() => window.print(), []);
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-    const timeStr = now.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    const { dateStr, timeStr } = useMemo(() => {
+        const now = new Date();
+        return {
+            dateStr: now.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            }),
+            timeStr: now.toLocaleTimeString(undefined, {
+                hour: '2-digit',
+                minute: '2-digit',
+            }),
+        };
+    }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const categories: Category[] = useMemo(() => {
+        if (!results) return [];
+        return [
+            {
+                title: 'Vital Parameters',
+                items: [
+                    { label: 'Heart Rate', value: fmt(results.heart_rate), unit: 'BPM' },
+                    {
+                        label: 'Respiratory Rate',
+                        value: fmt(results.respiratory_rate),
+                        unit: 'br/min',
+                    },
+                    {
+                        label: 'Blood Pressure',
+                        value:
+                            results.blood_pressure_sys && results.blood_pressure_dia
+                                ? `${fmt(results.blood_pressure_sys)}/${fmt(results.blood_pressure_dia)}`
+                                : '--',
+                        unit: 'mmHg',
+                    },
+                    {
+                        label: 'Oxygen Saturation',
+                        value: fmt(results.spo2_estimate),
+                        unit: '%',
+                    },
+                ],
+            },
+            {
+                title: 'Internal Health Markers',
+                items: [
+                    {
+                        label: 'Hemoglobin (Est)',
+                        value: fmt(results.hemoglobin, 1),
+                        unit: 'g/dL',
+                    },
+                    { label: 'Glucose Trend', value: fmt(results.glucose), unit: 'mg/dL' },
+                    { label: 'Skin Temp', value: fmt(results.skin_temp, 1), unit: '°F' },
+                    { label: 'Hydration', value: fmt(results.hydration, 1), unit: '/ 10' },
+                ],
+            },
+            {
+                title: 'Cardiovascular Analysis',
+                items: [
+                    {
+                        label: 'Cardio Age',
+                        value: results.cardio_age ? fmt(results.cardio_age) : '--',
+                        unit: 'Years',
+                    },
+                    {
+                        label: 'Vascular Health',
+                        value: fmt(results.vascular_health),
+                        unit: '%',
+                    },
+                    {
+                        label: 'Hypertension Risk',
+                        value: results.htn_risk,
+                        unit: '',
+                    },
+                    {
+                        label: 'Cardiac Index',
+                        value: fmt(results.cardiac_index, 2),
+                        unit: 'L/min/m²',
+                    },
+                ],
+            },
+        ];
+    }, [results]);
+
+    if (!results) return null;
 
     const confidenceColor =
         results.confidence >= 80
@@ -68,70 +142,11 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
                 ? '#d97706'
                 : '#dc2626';
 
-    const categories: Category[] = [
-        {
-            title: 'Vital Parameters',
-            items: [
-                { label: 'Heart Rate', value: fmt(results.heart_rate), unit: 'BPM' },
-                {
-                    label: 'Respiratory Rate',
-                    value: fmt(results.respiratory_rate),
-                    unit: 'br/min',
-                },
-                {
-                    label: 'Blood Pressure',
-                    value:
-                        results.blood_pressure_sys && results.blood_pressure_dia
-                            ? `${fmt(results.blood_pressure_sys)}/${fmt(results.blood_pressure_dia)}`
-                            : '--',
-                    unit: 'mmHg',
-                },
-                {
-                    label: 'Oxygen Saturation',
-                    value: fmt(results.spo2_estimate),
-                    unit: '%',
-                },
-            ],
-        },
-        {
-            title: 'Internal Health Markers',
-            items: [
-                {
-                    label: 'Hemoglobin (Est)',
-                    value: fmt(results.hemoglobin, 1),
-                    unit: 'g/dL',
-                },
-                { label: 'Glucose Trend', value: fmt(results.glucose), unit: 'mg/dL' },
-                { label: 'Skin Temp', value: fmt(results.skin_temp, 1), unit: '°F' },
-                { label: 'Hydration', value: fmt(results.hydration, 1), unit: '/ 10' },
-            ],
-        },
-        {
-            title: 'Cardiovascular Analysis',
-            items: [
-                {
-                    label: 'Cardio Age',
-                    value: results.cardio_age ? fmt(results.cardio_age) : '--',
-                    unit: 'Years',
-                },
-                {
-                    label: 'Vascular Health',
-                    value: fmt(results.vascular_health),
-                    unit: '%',
-                },
-                {
-                    label: 'Hypertension Risk',
-                    value: results.htn_risk,
-                    unit: '',
-                },
-                {
-                    label: 'Cardiac Index',
-                    value: fmt(results.cardiac_index, 2),
-                    unit: 'L/min/m²',
-                },
-            ],
-        },
-    ];
+    // Sanitize session ID for display
+    const safeSessionId = results.sessionId
+        .replace(/[^a-zA-Z0-9-]/g, '')
+        .slice(0, 16)
+        .toUpperCase();
 
     return (
         <div
@@ -149,7 +164,7 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
                         <span className="results-subtitle">AI-Driven Vital Sign Assessment</span>
                     </div>
                     <div className="report-metadata">
-                        <div><strong>Ref:</strong> TG-{results.sessionId.toUpperCase()}</div>
+                        <div><strong>Ref:</strong> TG-{safeSessionId}</div>
                         <div><strong>Date:</strong> {dateStr}</div>
                         <div><strong>Time:</strong> {timeStr}</div>
                     </div>
@@ -222,6 +237,59 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
                     ))}
                 </div>
 
+                {/* Wellness & Stress Summary */}
+                <div className="report-category-group">
+                    <div className="report-category-title">Autonomic & Wellness</div>
+                    <div className="report-metric-grid">
+                        <div className="report-metric-item">
+                            <div>
+                                <div className="metric-label">Stress Index</div>
+                                <div className="metric-value-row">
+                                    <span className="metric-value">{fmt(results.stress_index)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="report-metric-item">
+                            <div>
+                                <div className="metric-label">Wellness Score</div>
+                                <div className="metric-value-row">
+                                    <span className="metric-value">{fmt(results.wellness_score, 1)}</span>
+                                    <span className="metric-unit">/ 10</span>
+                                </div>
+                            </div>
+                            {results.wellness_score !== null && (
+                                <span
+                                    className="metric-status-badge"
+                                    style={{
+                                        background: results.wellness_score >= 7 ? '#05966915' : '#dc262615',
+                                        color: results.wellness_score >= 7 ? '#059669' : '#dc2626',
+                                    }}
+                                >
+                                    {results.wellness_score >= 7 ? 'Good' : results.wellness_score >= 4 ? 'Moderate' : 'Low'}
+                                </span>
+                            )}
+                        </div>
+                        <div className="report-metric-item">
+                            <div>
+                                <div className="metric-label">Sympathetic</div>
+                                <div className="metric-value-row">
+                                    <span className="metric-value">{fmt(results.sympathetic_activity)}</span>
+                                    <span className="metric-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="report-metric-item">
+                            <div>
+                                <div className="metric-label">Parasympathetic</div>
+                                <div className="metric-value-row">
+                                    <span className="metric-value">{fmt(results.parasympathetic_activity)}</span>
+                                    <span className="metric-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Footer */}
                 <div className="results-footer">
                     <p className="results-disclaimer">
@@ -235,7 +303,7 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
                         <button
                             className="btn btn-ghost"
                             id="btnPrintReport"
-                            onClick={() => window.print()}
+                            onClick={handlePrint}
                             aria-label="Download or print this report"
                         >
                             Download / Print Report
@@ -254,6 +322,8 @@ const ResultsOverlay: React.FC<ResultsOverlayProps> = ({
             </div>
         </div>
     );
-};
+});
+
+ResultsOverlay.displayName = 'ResultsOverlay';
 
 export default ResultsOverlay;

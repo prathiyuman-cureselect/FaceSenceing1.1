@@ -203,17 +203,35 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CONFIG.server.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
+# Security: Add security headers
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' ws: wss:; "
+        "media-src 'self' blob:; "
+        "font-src 'self';"
+    )
+    return response
+
 # ─── Static File Serving ─────────────────────────────────────────────
-# Priority: React production build (frontend-dist/) > legacy frontend/
+# Priority: React production build (frontend-dist/)
 import os
 
 _root = os.path.dirname(os.path.dirname(__file__))
 _react_dist = os.path.join(_root, "frontend-dist")
-_legacy_dir = os.path.join(_root, "frontend")
 
 # Serve React build assets (JS, CSS chunks, images etc.)
 if os.path.exists(_react_dist):
@@ -222,24 +240,15 @@ if os.path.exists(_react_dist):
     _asserts_in_dist = os.path.join(_react_dist, "asserts")
     if os.path.exists(_asserts_in_dist):
         app.mount("/asserts", StaticFiles(directory=_asserts_in_dist), name="asserts")
-elif os.path.exists(_legacy_dir):
-    # Fallback: legacy plain-HTML build
-    app.mount("/css", StaticFiles(directory=os.path.join(_legacy_dir, "css")), name="css")
-    app.mount("/js",  StaticFiles(directory=os.path.join(_legacy_dir, "js")),  name="js")
-    app.mount("/asserts", StaticFiles(directory=os.path.join(_legacy_dir, "asserts")), name="asserts")
 
 
 # ─── REST Endpoints ───────────────────────────────────────────────────
 @app.get("/", response_class=FileResponse)
 async def serve_frontend():
     """Serve the React frontend SPA."""
-    # React dist takes priority over legacy
     react_index = os.path.join(_react_dist, "index.html")
     if os.path.exists(react_index):
         return FileResponse(react_index)
-    legacy_index = os.path.join(_legacy_dir, "index.html")
-    if os.path.exists(legacy_index):
-        return FileResponse(legacy_index)
     return {"message": "rPPG API Server", "docs": "/docs"}
 
 
@@ -297,69 +306,139 @@ async def reset_session(session_id: str):
     return {"status": "reset", "session_id": session_id}
 
 
+# ─── Security Constants ──────────────────────────────────────────────
+import re
+
+MAX_FRAME_SIZE = 5 * 1024 * 1024  # 5 MB max frame payload
+MAX_MESSAGE_SIZE = 6 * 1024 * 1024  # 6 MB max WS message
+SESSION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
+VALID_COMMANDS = {"reset", "calibrate", "stats"}
+MAX_FRAME_DIMENSIONS = (1920, 1080)
+
+
+def _sanitize_error(msg: str) -> str:
+    """Strip internal paths and sensitive info from error messages."""
+    # Remove file paths
+    sanitized = re.sub(r"(/[a-zA-Z0-9_\-./]+)", "[path]", msg)
+    # Remove anything that looks like a stack trace line
+    sanitized = re.sub(r"File \".*?\".*?line \d+", "[internal]", sanitized)
+    # Truncate
+    return sanitized[:200]
+
+
+def _validate_session_id(session_id: str) -> bool:
+    """Validate session ID format to prevent injection attacks."""
+    return bool(SESSION_ID_PATTERN.match(session_id))
+
+
 # ─── WebSocket Endpoint ──────────────────────────────────────────────
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for real-time video frame processing.
 
+    Security:
+    - Session ID validation (alphanumeric + hyphens only)
+    - Frame size limits (5 MB max)
+    - Frame dimension validation (max 1920x1080)
+    - Sanitized error responses (no internal details leaked)
+    - Auto-cleanup on disconnect
+
     Protocol:
-    - Client sends base64-encoded JPEG frames
+    - Client sends base64-encoded JPEG frames in JSON: {"frame": "data:image/jpeg;base64,..."}
     - Server responds with JSON MeasurementResult
     """
+    # Security: Validate session ID format
+    if not _validate_session_id(session_id):
+        await websocket.close(code=4001, reason="Invalid session ID format")
+        logger.warning(f"Rejected WebSocket with invalid session ID: {session_id[:32]}")
+        return
+
     await websocket.accept()
     logger.info(f"WebSocket connected: {session_id}")
 
     # Get or create session
+    actual_session_id = session_id
     if session_id not in session_manager.sessions:
-        session_manager.create_session()
-        # Use the new session
-        engine = session_manager.sessions[list(session_manager.sessions.keys())[-1]]["engine"]
-        actual_session_id = list(session_manager.sessions.keys())[-1]
+        try:
+            actual_session_id = session_manager.create_session()
+        except HTTPException:
+            await websocket.close(code=4029, reason="Maximum sessions reached")
+            return
+        engine = session_manager.get_engine(actual_session_id)
     else:
         engine = session_manager.get_engine(session_id)
-        actual_session_id = session_id
 
     try:
         while True:
             # Receive frame data
             data = await websocket.receive_text()
 
+            # Security: reject oversized messages
+            if len(data) > MAX_MESSAGE_SIZE:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Message too large"
+                })
+                continue
+
             try:
                 message = json.loads(data)
+
+                # Security: validate message structure
+                if not isinstance(message, dict):
+                    continue
+
                 frame_data = message.get("frame", "")
                 command = message.get("command", "")
 
-                # Handle commands
-                if command == "reset":
-                    engine.reset()
-                    await websocket.send_json({
-                        "type": "command_response",
-                        "command": "reset",
-                        "status": "ok"
-                    })
-                    continue
+                # Handle commands (whitelist only)
+                if command:
+                    if command not in VALID_COMMANDS:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Unknown command: {command}"
+                        })
+                        continue
 
-                if command == "calibrate":
-                    calib_data = message.get("data", {})
-                    if hasattr(engine, 'set_calibration'):
-                        engine.set_calibration(calib_data)
-                    await websocket.send_json({
-                        "type": "command_response",
-                        "command": "calibrate",
-                        "status": "ok"
-                    })
-                    continue
+                    if command == "reset":
+                        engine.reset()
+                        await websocket.send_json({
+                            "type": "command_response",
+                            "command": "reset",
+                            "status": "ok"
+                        })
+                        continue
 
-                if command == "stats":
-                    stats = engine.get_session_stats()
-                    await websocket.send_json({
-                        "type": "stats",
-                        "data": stats
-                    })
-                    continue
+                    if command == "calibrate":
+                        calib_data = message.get("data", {})
+                        # Security: validate calibration data types
+                        if isinstance(calib_data, dict) and hasattr(engine, 'set_calibration'):
+                            engine.set_calibration(calib_data)
+                        await websocket.send_json({
+                            "type": "command_response",
+                            "command": "calibrate",
+                            "status": "ok"
+                        })
+                        continue
+
+                    if command == "stats":
+                        stats = engine.get_session_stats()
+                        await websocket.send_json({
+                            "type": "stats",
+                            "data": stats
+                        })
+                        continue
 
                 if not frame_data:
+                    continue
+
+                # Security: validate frame size before decoding
+                if len(frame_data) > MAX_FRAME_SIZE:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Frame too large"
+                    })
                     continue
 
                 # Decode base64 JPEG frame
@@ -377,13 +456,24 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     })
                     continue
 
+                # Security: validate frame dimensions
+                h, w = frame.shape[:2]
+                if w > MAX_FRAME_DIMENSIONS[0] or h > MAX_FRAME_DIMENSIONS[1]:
+                    # Resize instead of rejecting for better UX
+                    scale = min(MAX_FRAME_DIMENSIONS[0] / w, MAX_FRAME_DIMENSIONS[1] / h)
+                    frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+
                 # Process through rPPG pipeline
                 result = engine.process_frame(frame)
 
                 # Update session stats
                 session_manager.update_stats(actual_session_id, result)
 
-                # Send result
+                # Build response — convert numpy types to native Python
+                raw_signal = result.raw_signal[-100:] if result.raw_signal else []
+                spectrum = result.spectrum[:100] if result.spectrum else []
+                spectrum_freqs = result.spectrum_freqs[:100] if result.spectrum_freqs else []
+
                 response = {
                     "type": "measurement",
                     "data": {
@@ -401,16 +491,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             "respiratory_rate": result.vitals.respiratory_rate,
                         },
                         "quality": {
-                            "snr_db": result.quality.snr_db,
-                            "spectral_purity": result.quality.spectral_purity,
-                            "motion_score": result.quality.motion_score,
-                            "face_confidence": result.quality.face_confidence,
+                            "snr_db": round(result.quality.snr_db, 2),
+                            "spectral_purity": round(result.quality.spectral_purity, 3),
+                            "motion_score": round(result.quality.motion_score, 2),
+                            "face_confidence": round(result.quality.face_confidence, 3),
                             "level": result.quality.overall_level.value,
                             "acceptable": result.quality.is_acceptable,
                         },
-                        "signal": result.raw_signal[-100:],  # Last 100 points
-                        "spectrum": result.spectrum[:100],
-                        "spectrum_freqs": result.spectrum_freqs[:100],
+                        "signal": [round(float(v), 4) for v in raw_signal],
+                        "spectrum": [round(float(v), 4) for v in spectrum],
+                        "spectrum_freqs": [round(float(v), 4) for v in spectrum_freqs],
                     }
                 }
 
@@ -419,6 +509,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             except json.JSONDecodeError:
                 # Handle raw base64 frame (no JSON wrapper)
                 try:
+                    if len(data) > MAX_FRAME_SIZE:
+                        continue
                     if "," in data:
                         data = data.split(",")[1]
                     img_bytes = base64.b64decode(data)
@@ -435,14 +527,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 except Exception as e:
                     await websocket.send_json({
                         "type": "error",
-                        "message": str(e)
+                        "message": _sanitize_error(str(e))
                     })
 
             except Exception as e:
                 logger.error(f"Frame processing error: {e}")
                 await websocket.send_json({
                     "type": "error",
-                    "message": f"Processing error: {str(e)}"
+                    "message": _sanitize_error(str(e))
                 })
 
     except WebSocketDisconnect:
@@ -450,7 +542,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
+        # Auto-cleanup session on disconnect
         logger.info(f"Cleaning up session {actual_session_id}")
+        session_manager.destroy_session(actual_session_id)
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────
