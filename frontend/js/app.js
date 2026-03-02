@@ -732,32 +732,69 @@ function resetSession() {
 
 // ─── Measurement Handler ─────────────────────────────────────────────
 function handleMeasurement(data) {
-    // Face detection state
-    DOM.videoWrapper.classList.toggle('face-detected', data.face_detected);
-    DOM.videoWrapper.classList.toggle('no-face', !data.face_detected);
+    const result = data; // Renamed 'data' to 'result' for consistency with the new code structure
+
+    // 1. Handling Message Bar Feedback
+    if (result.message) {
+        DOM.messageText.textContent = result.message;
+
+        // Visual feedback for scanning phase
+        if (result.message.includes("Scanning Face")) {
+            DOM.messageBar.style.background = "linear-gradient(90deg, #1e293b, #334155)";
+            DOM.messageBar.style.borderColor = "#3b82f6";
+        } else if (result.message.includes("Too much movement")) {
+            DOM.messageBar.style.background = "linear-gradient(90deg, #450a0a, #7f1d1d)";
+            DOM.messageBar.style.borderColor = "#ef4444";
+        } else {
+            DOM.messageBar.style.background = "var(--glass-bg)";
+            DOM.messageBar.style.borderColor = "var(--glass-border)";
+        }
+    }
+
+    // 2. Face Rectangle Overlay
+    if (result.face_rect) {
+        const [x, y, w, h] = result.face_rect;
+        drawFaceOverlay(x, y, w, h);
+    } else {
+        // Clear face overlay if no face is detected
+        clearFaceOverlay();
+    }
+
+    // Face detection state (moved from original position)
+    DOM.videoWrapper.classList.toggle('face-detected', result.face_detected);
+    DOM.videoWrapper.classList.toggle('no-face', !result.face_detected);
 
     if (DOM.faceGuideText) {
-        if (data.face_detected) {
+        if (result.face_detected) {
             DOM.faceGuideText.textContent = "Face Detected - Hold Still";
         } else {
             DOM.faceGuideText.textContent = "Please put your face within the frame";
         }
     }
 
-    // Buffer progress
-    DOM.bufferFill.style.width = `${data.buffer_fill}%`;
-    DOM.bufferLabel.textContent = `Buffer: ${data.buffer_fill.toFixed(0)}%`;
-
-    // FPS
-    DOM.fpsBadge.textContent = `${data.fps_actual} FPS`;
-
-    // Message
-    if (data.message) {
-        updateMessage(data.message);
+    // 3. Status Badge Updates
+    if (result.quality) {
+        DOM.qualityChipText.textContent = `Quality: ${result.quality.overall_level.toUpperCase()}`;
+        const colors = { EXCELLENT: '#059669', GOOD: '#10b981', FAIR: '#d97706', POOR: '#dc2626', REJECTED: '#7f1d1d' };
+        DOM.qualityChip.style.background = colors[result.quality.overall_level.toUpperCase()] || '#1e293b';
     }
 
-    // Vitals
-    updateVitals(data.vitals);
+    // 4. Progress Tracking
+    if (result.buffer_fill !== undefined) {
+        DOM.bufferFill.style.width = `${result.buffer_fill}%`;
+        DOM.bufferLabel.textContent = `Buffer: ${Math.round(result.buffer_fill)}%`;
+    }
+
+    // FPS (moved from original position)
+    if (result.fps_actual) {
+        DOM.fpsBadge.textContent = `${result.fps_actual} FPS`;
+    }
+
+    // 5. Update Vitals if Scanning is complete
+    // The original updateVitals function is called here, but with the new condition
+    if (result.vitals && !result.message.includes("Scanning Face")) {
+        updateVitals(result.vitals);
+    }
 
     // Accumulate ALL vitals for median computation at end (only during the 'vitals' phase)
     // Removed strict 'quality.acceptable' filter here so we always collect data.

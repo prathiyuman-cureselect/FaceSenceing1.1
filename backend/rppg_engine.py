@@ -57,6 +57,14 @@ class RPPGEngine:
         self._timestamp_buffer: deque = deque(maxlen=self.config.buffer_size)
         self._pulse_signal: np.ndarray = np.array([])
 
+        # Calibration & Scanning State
+        self._is_calibrating = True
+        self._calibration_frames = 60  # ~2 seconds of "Face Scan"
+        self._age_history = []
+        self._gender_history = []
+        self._stable_age = None
+        self._stable_gender = None
+        
         # Motion estimation
         self._prev_gray: Optional[np.ndarray] = None
         self._motion_score: float = 0.0
@@ -72,169 +80,137 @@ class RPPGEngine:
 
     def process_frame(self, frame: np.ndarray) -> MeasurementResult:
         """
-        Process a single video frame through the rPPG pipeline.
-
-        Args:
-            frame: BGR image from camera
-
-        Returns:
-            MeasurementResult with vitals, quality, and signal data
+        Premium rPPG pipeline with explicit Face Scanning phase and comprehensive vitals.
         """
         self._frames_processed += 1
         result = MeasurementResult()
         result.fps_actual = self._compute_actual_fps()
 
-        # Step 1: Face detection
+        # Step 1: High-precision Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
         result.face_detected = face_rect is not None
-        result.face_rect = face_rect  # Store for frontend
+        result.face_rect = face_rect
 
         if not result.face_detected:
             result.message = "No face detected. Please position your face in the frame."
             result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
             return result
 
-        # Step 1b: Age & Gender estimation (every 15 frames to avoid overhead)
-        if self._frames_processed % 15 == 1:
-            estimated_age = self.face_detector.estimate_age(frame, face_rect)
-            if estimated_age is not None:
-                self._last_age = estimated_age
-            estimated_gender = self.face_detector.estimate_gender(frame, face_rect)
-            if estimated_gender is not None:
-                self._last_gender = estimated_gender
-        result.estimated_age = getattr(self, '_last_age', None)
-        result.estimated_gender = getattr(self, '_last_gender', None)
+        # Step 1b: Face Scanning / Calibration Phase
+        if self._is_calibrating:
+            est_age = self.face_detector.estimate_age(frame, face_rect)
+            est_gender = self.face_detector.estimate_gender(frame, face_rect)
+            
+            if est_age: self._age_history.append(est_age)
+            if est_gender: self._gender_history.append(est_gender)
+            
+            progress = (self._frames_processed / self._calibration_frames) * 100
+            result.message = f"Scanning Face... {min(100, progress):.0f}%"
+            
+            if self._frames_processed >= self._calibration_frames:
+                self._is_calibrating = False
+                if self._age_history:
+                    self._stable_age = int(np.median(self._age_history))
+                if self._gender_history:
+                    self._stable_gender = max(set(self._gender_history), key=self._gender_history.count)
+                logger.info(f"Calibration complete: {self._stable_gender}, {self._stable_age}")
 
-        # Dynamic FPS Adaptation: Update signal processor with real-world timing
-        if result.fps_actual > 5.0 and abs(self.signal_processor.fps - result.fps_actual) > 2.0:
-            logger.info(f"Adapting filters to actual FPS: {result.fps_actual}")
-            self.signal_processor.update_fps(result.fps_actual)
+        result.estimated_age = self._stable_age
+        result.estimated_gender = self._stable_gender
 
-        # Step 2: Motion estimation
+        # Step 2: Motion Robustness
         self._estimate_motion(frame)
-
-        # Step 3: RGB signal extraction
-        rgb_signal = self.face_detector.extract_rgb_signal(frame, face_rect)
-        if rgb_signal is None:
-            result.message = "Unable to extract skin signal. Ensure good lighting."
-            result.buffer_fill = len(self._rgb_buffer) / self.config.buffer_size * 100
+        if self._motion_score > 15.0:
+            result.message = "Too much movement. Please stay still."
             return result
 
-        # Add to buffer
+        # Step 3: Precise RGB extraction with Skin Masking
+        rgb_signal = self.face_detector.extract_rgb_signal(frame, face_rect)
+        if rgb_signal is None:
+            result.message = "Searching for skin pixels..."
+            return result
+
+        # Add to rolling buffer
         self._rgb_buffer.append(rgb_signal)
         self._timestamp_buffer.append(time.time())
 
         buffer_len = len(self._rgb_buffer)
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
-        # Need minimum buffer for analysis
+        # Step 4: Core rPPG Processing (only when enough data)
         if buffer_len < self.config.min_buffer_size:
-            result.message = (
-                f"Collecting data... {result.buffer_fill:.0f}% "
-                f"({buffer_len}/{self.config.min_buffer_size} frames needed)"
-            )
+            if not self._is_calibrating:
+                result.message = f"Analyzing Pulse... {result.buffer_fill:.0f}%"
             return result
 
-        # Step 4: POS Algorithm
+        # Step 5: Advanced POS extraction
         rgb_array = np.array(self._rgb_buffer)
         pulse_signal = self._pos_algorithm(rgb_array)
 
-        if pulse_signal is None or len(pulse_signal) < 20:
-            result.message = "Insufficient signal quality for POS extraction."
+        if pulse_signal is None:
+            result.message = "Signal noise too high."
             return result
 
         self._pulse_signal = pulse_signal
 
-        # Step 5: Detrend
+        # Step 6: Signal Refinement & Vitals Extraction
         detrended = self.signal_processor.detrend_signal(pulse_signal)
-
-        # Step 6: Bandpass filter (HR band)
         hr_filtered = self.signal_processor.bandpass_filter(detrended, "hr")
-
-        # Step 7: Bandpass filter (RR band)
         rr_filtered = self.signal_processor.bandpass_filter(detrended, "rr")
 
-        # Step 8: Compute vitals
+        # Step 7: Vitals Computation
         vitals = VitalSigns()
         vitals.heart_rate = self.signal_processor.compute_heart_rate(hr_filtered)
-        vitals.respiratory_rate = self.signal_processor.compute_respiratory_rate(
-            rr_filtered
-        )
+        vitals.respiratory_rate = self.signal_processor.compute_respiratory_rate(rr_filtered)
 
-        # 1. Advanced HRV (RMSSD, SDNN, pNN50, Stress, LF/HF)
+        # HRV Metrics
         hrv_metrics = self.signal_processor.compute_hrv(hr_filtered)
         vitals.hrv_rmssd = hrv_metrics["rmssd"]
-        vitals.hrv_sdnn = hrv_metrics["sdnn"]
-        vitals.hrv_pnn50 = hrv_metrics["pnn50"]
         vitals.stress_index = hrv_metrics["stress_index"]
         vitals.lf_hf_ratio = hrv_metrics["lf_hf_ratio"]
 
-        # 2. Blood Pressure (Estimated)
+        # Advanced Vitals Estimation
         if vitals.heart_rate:
             amp = np.std(hr_filtered)
-            sys, dia = self.signal_processor.estimate_bp(
-                vitals.heart_rate,
-                amp,
-                hr_filtered=hr_filtered,
-                rgb_array=rgb_array,
+            vitals.blood_pressure_sys, vitals.blood_pressure_dia = self.signal_processor.estimate_bp(
+                vitals.heart_rate, amp, hr_filtered=hr_filtered, rgb_array=rgb_array
             )
-            vitals.blood_pressure_sys = sys
-            vitals.blood_pressure_dia = dia
+            vitals.spo2_estimate = self.signal_processor.estimate_spo2(rgb_array[:, 0], rgb_array[:, 2])
+            
+            # --- Comprehensive Health Proxies ---
+            # SNS / PNS Activity
+            if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
+                total = vitals.lf_hf_ratio + 1.0
+                vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
+                vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
 
-        # 3. Perfusion Index & Temperature
-        vitals.perfusion_index = self.signal_processor.compute_perfusion_index(
-            hr_filtered, np.mean(rgb_array, axis=0)
-        )
-        vitals.skin_temp = self.signal_processor.estimate_skin_temp(self._rgb_buffer[-1])
-
-        # 4. SpO2
-        vitals.spo2_estimate = self.signal_processor.estimate_spo2(
-            rgb_array[:, 0],  # Red channel
-            rgb_array[:, 2],  # Blue channel
-        )
-
-        # 5. SNS / PNS Activity
-        if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
-            total = vitals.lf_hf_ratio + 1.0
-            vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
-            vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
-        
-        # 6. Bloodless Blood Tests (AI Proxies)
-        # Hemoglobin (Hb): often correlated with R/G ratio in skin reflectance
-        r_g_ratio = np.mean(rgb_array[:, 0]) / (np.mean(rgb_array[:, 1]) + 1e-10)
-        vitals.hemoglobin = round(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)), 1)
-        
-        # Glucose Trend: experimental morphological proxy
-        vitals.blood_glucose = round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0)
-        vitals.hba1c = round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1)
-        
-        # Hydration: based on absorption variance
-        vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_array[:, 2]) * 100)), 1)
-
-        # 7. Chronic Disease Risks & Cardio Age
-        base_age = getattr(self, '_last_age', 30)
-        vitals.cardio_age = int(base_age + (vitals.stress_index / 100 if vitals.stress_index else 0))
-        
-        # Hypertension Risk
-        if vitals.blood_pressure_sys:
+            # Blood Markers
+            r_g_ratio = np.mean(rgb_array[:, 0]) / (np.mean(rgb_array[:, 1]) + 1e-10)
+            vitals.hemoglobin = round(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)), 1)
+            
+            vitals.perfusion_index = self.signal_processor.compute_perfusion_index(hr_filtered, np.mean(rgb_array, axis=0))
+            vitals.blood_glucose = round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0)
+            vitals.hba1c = round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1)
+            vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_array[:, 2]) * 100)), 1)
+            
+            # Risks & Cardiovascular Age
+            base_age = self._stable_age or 30
+            vitals.cardio_age = int(base_age + (vitals.stress_index / 100 if vitals.stress_index else 0))
+            vitals.vascular_health = round(max(0, min(100, 100 - (vitals.cardio_age - base_age) * 10)), 1)
+            vitals.cardiac_index = round(max(2.0, min(4.5, 3.0 + (vitals.heart_rate - 70) * 0.01)), 2)
+            
             if vitals.blood_pressure_sys > 140: vitals.hypertension_risk = "High"
             elif vitals.blood_pressure_sys > 130: vitals.hypertension_risk = "Elevated"
             else: vitals.hypertension_risk = "Low"
-            
-        vitals.vascular_health = round(max(0, min(100, 100 - (vitals.cardio_age - base_age) * 10)), 1)
-        
-        # Cardiac Index estimation (Volume proxy)
-        vitals.cardiac_index = round(max(2.0, min(4.5, 3.0 + (vitals.heart_rate - 70) * 0.01 if vitals.heart_rate else 0)), 2)
 
-        # 8. Composite Wellness Score
-        ws_components = []
-        if vitals.heart_rate: ws_components.append(max(0, 10 - abs(vitals.heart_rate - 70) * 0.2))
-        if vitals.stress_index: ws_components.append(max(0, 10 - vitals.stress_index / 100))
-        if vitals.vascular_health: ws_components.append(vitals.vascular_health / 10.0)
-        if ws_components:
-            vitals.wellness_score = round(sum(ws_components) / len(ws_components), 1)
+            # Wellness Score
+            ws_comp = []
+            if vitals.heart_rate: ws_comp.append(max(0, 10 - abs(vitals.heart_rate - 70) * 0.2))
+            if vitals.stress_index: ws_comp.append(max(0, 10 - vitals.stress_index / 100))
+            if vitals.vascular_health: ws_comp.append(vitals.vascular_health / 10.0)
+            if ws_comp: vitals.wellness_score = round(sum(ws_comp) / len(ws_comp), 1)
 
-        # Step 9: Signal Quality
+        # Step 8: Quality Assurance
         quality = self.signal_processor.compute_sqi(
             raw_signal=pulse_signal,
             filtered_signal=hr_filtered,
@@ -242,34 +218,21 @@ class RPPGEngine:
             motion_score=self._motion_score,
         )
 
-        # Step 10: Rejection logic
-        if quality.overall_level == SignalQualityLevel.REJECTED:
-            # Downgrade to POOR instead of violently rejecting and dumping the buffers
-            quality.overall_level = SignalQualityLevel.POOR
-            result.message = "Signal quality marginal. Continuing to collect data..."
+        # Final Rejection Logic — Prevent "Abnormal" data
+        if quality.overall_level == SignalQualityLevel.REJECTED or vitals.heart_rate is None:
+            result.message = "Poor signal quality. Checking..."
+            return result
         
-        # Always output vitals and aggregates for POOR, FAIR, GOOD, EXCELLENT
-        if vitals.heart_rate is not None:
+        # Stability check: Only add to history if readings are physically plausible
+        if 40 <= vitals.heart_rate <= 160:
             self._hr_history.append(vitals.heart_rate)
-        if vitals.respiratory_rate is not None:
+        if 8 <= vitals.respiratory_rate <= 40:
             self._rr_history.append(vitals.respiratory_rate)
-
-        result.message = f"Quality: {quality.overall_level.value}"
-        quality.is_acceptable = True
-
-        # Prepare spectrum for frontend
-        freqs, power, _ = self.signal_processor.compute_fft(
-            hr_filtered,
-            (CONFIG.filter.hr_low_freq, CONFIG.filter.hr_high_freq)
-        )
 
         result.vitals = vitals
         result.quality = quality
-        result.raw_signal = hr_filtered[-200:].tolist()  # Last ~7s
-        result.spectrum = (power / (np.max(power) + 1e-10)).tolist() if len(power) > 0 else []
-        result.spectrum_freqs = freqs.tolist() if len(freqs) > 0 else []
-
-        self._last_measurement = result
+        result.message = f"Quality: {quality.overall_level.value.upper()}"
+        
         return result
 
     def _pos_algorithm(self, rgb: np.ndarray) -> Optional[np.ndarray]:
