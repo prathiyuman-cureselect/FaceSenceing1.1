@@ -1420,8 +1420,10 @@ function updateMessage(text, type = 'info') {
         error: '❌',
         warning: '⚠️',
     };
-    DOM.messageText.textContent = text;
-    DOM.messageBar.querySelector('.icon').textContent = icons[type] || 'ℹ️';
+    if (DOM.messageText) DOM.messageText.textContent = text;
+
+    const iconEl = DOM.messageBar ? DOM.messageBar.querySelector('.icon') : null;
+    if (iconEl) iconEl.textContent = icons[type] || 'ℹ️';
 }
 
 function resetUI() {
