@@ -123,7 +123,7 @@ const VitalsGrid: React.FC<VitalsGridProps> = memo(({
         let _balanceColor: string | undefined;
         if (_lfhf !== null) {
             if (_lfhf > 2.0) { _balanceText = 'Sympathetic'; _balanceColor = '#f87171'; }
-            else if (_lfhf < 0.5) { _balanceText = 'Parasymp.'; _balanceColor = '#60a5fa'; }
+            else if (_lfhf < 0.5) { _balanceText = 'Parasymp.'; _balanceColor = '#34d399'; }
             else { _balanceText = 'Balanced'; _balanceColor = '#10b981'; }
         }
 

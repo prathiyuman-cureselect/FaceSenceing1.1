@@ -22,11 +22,11 @@ export function fmt(val: number | null | undefined, decimals = 0): string {
 }
 
 export function getQualityColor(value: number): string {
-    if (value >= 0.8) return '#10b981';
-    if (value >= 0.6) return '#06b6d4';
-    if (value >= 0.4) return '#f59e0b';
-    if (value >= 0.2) return '#ef4444';
-    return '#6b7280';
+    if (value >= 0.8) return '#059669'; // Emerald (Excellent)
+    if (value >= 0.6) return '#10b981'; // Green (Good)
+    if (value >= 0.4) return '#fbbf24'; // Amber (Fair)
+    if (value >= 0.2) return '#f87171'; // Red (Poor)
+    return '#94a3b8'; // Muted (Rejected)
 }
 
 export function isDataAccurate(

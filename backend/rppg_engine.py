@@ -59,13 +59,18 @@ class RPPGEngine:
 
         # Calibration & Scanning State
         self._is_calibrating = True
-        self._calibration_frames = 150  # ~5 seconds at 30fps for stable profile
+        self._calibration_frames = 50  # Even faster (1.5 seconds)
+        self._calibration_progress = 0
         self._age_history = []
         self._gender_history = []
         self._sentiment_history = []
+        
         self._stable_age = None
         self._stable_gender = None
         self._stable_sentiment = None
+        
+        # Persistence tracking
+        self._last_vitals: Optional[VitalSigns] = None
         
         # History for result smoothing (Binah-style stability)
         self._hr_history: deque = deque(maxlen=10)
@@ -90,9 +95,8 @@ class RPPGEngine:
         """
         Premium rPPG pipeline with explicit Face Scanning phase and comprehensive vitals.
         """
-        self._frames_processed += 1
         result = MeasurementResult()
-        result.fps_actual = self._compute_actual_fps()
+        result.fps_actual = float(self.fps)
 
         # Step 1: High-precision Face detection
         face_rect, face_confidence = self.face_detector.detect_face(frame)
@@ -100,6 +104,7 @@ class RPPGEngine:
         if face_rect is None:
             self._face_lost_counter += 1
             if self._face_lost_counter <= self._max_face_lost:
+                # Coasting on last known face position
                 face_rect = self.face_detector._prev_face_rect
                 face_confidence = 0.5 # Reduced confidence during coasting
                 result.face_detected = face_rect is not None
@@ -118,6 +123,7 @@ class RPPGEngine:
 
         # Step 1b: Face Scanning / Calibration Phase
         if self._is_calibrating:
+            self._calibration_progress += 1
             est_age = self.face_detector.estimate_age(frame, face_rect)
             est_gender = self.face_detector.estimate_gender(frame, face_rect)
             est_sentiment = self.face_detector.estimate_sentiment(frame, face_rect)
@@ -127,10 +133,10 @@ class RPPGEngine:
             if est_sentiment: 
                 self._sentiment_history.append(est_sentiment)
             
-            progress = (self._frames_processed / self._calibration_frames) * 100
-            result.message = f"Analyzing Face Profile... {min(100, progress):.0f}%"
+            progress = (self._calibration_progress / self._calibration_frames) * 100
+            result.message = f"Scanning Face... {min(100, progress):.0f}%"
             
-            if self._frames_processed >= self._calibration_frames:
+            if self._calibration_progress >= self._calibration_frames:
                 self._is_calibrating = False
                 if self._age_history:
                     self._stable_age = int(np.median(self._age_history))
@@ -140,8 +146,10 @@ class RPPGEngine:
                     self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
                 else:
                     self._stable_sentiment = "Neutral"
-                logger.info(f"Analysis complete: {self._stable_gender}, {self._stable_age}, {self._stable_sentiment}")
-                result.message = "Face Locked. Starting Vitals Scan..."
+                result.message = "Face Analyzed. Extracing Vitals..."
+                self._face_lost_counter = 0 # Reset lost counter on valid scan phase
+        
+        self._frames_processed += 1 # Total frames processed (including no face)
 
         result.estimated_age = self._stable_age
         result.estimated_gender = self._stable_gender
@@ -189,9 +197,11 @@ class RPPGEngine:
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
         # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
-        if buffer_len < self.config.min_buffer_size:
-            result.message = f"Analyzing Pulse... {result.buffer_fill:.0f}%"
+        if buffer_len < 30: # 1 second of data
+            result.message = f"Locking Pulse... {result.buffer_fill:.0f}%"
             return result
+            
+        logger.info(f"Processing signal buffer: {buffer_len} frames")
 
         # rgb_array shape: (Time, Patches, 3)
         rgb_array = np.array(self._rgb_buffer)
@@ -310,8 +320,15 @@ class RPPGEngine:
 
         result.vitals = vitals
         result.quality = quality
-        result.message = f"Quality: {quality.overall_level.value.upper()}"
         
+        # PERSISTENCE: If heartbeat is missing this frame, use last known stable value
+        if not vitals.heart_rate and self._last_vitals:
+            result.vitals = self._last_vitals
+            result.message = "Stabilizing signal... please hold still"
+        else:
+            self._last_vitals = vitals
+            result.message = f"Quality: {quality.overall_level.value.upper()}"
+            
         return result
 
     def _fused_pos_algorithm(self, rgb_3d: np.ndarray) -> Optional[np.ndarray]:

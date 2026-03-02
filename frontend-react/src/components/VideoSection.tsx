@@ -119,7 +119,9 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
 
                 {/* Scanning Animation Components */}
                 {isRunning && <div className="scanning-line" aria-hidden="true" />}
-                <div className="face-lock-active" aria-hidden="true" />
+                <div className="face-lock-active" aria-hidden="true">
+                    <div className="loading-corners" aria-hidden="true" />
+                </div>
 
                 {/* Age / Gender badge */}
                 {(estimatedAge || estimatedGender) && isRunning && (

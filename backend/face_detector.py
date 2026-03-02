@@ -83,19 +83,23 @@ class FaceDetector:
         """Haar-based face detection with optimized parameters."""
         faces = self._cascade.detectMultiScale(
             enhanced_gray,
-            scaleFactor=1.1,
-            minNeighbors=3,
-            minSize=(30, 30)
+            scaleFactor=1.05,
+            minNeighbors=1,
+            minSize=(25, 25)
         )
 
         if len(faces) == 0:
             self._no_face_count += 1
+            # Coasting: Return previous rect if we just lost it briefly
+            if self._prev_face_rect and self._no_face_count < 5:
+                return self._prev_face_rect, 0.4
             return None, 0.0
 
         self._no_face_count = 0
         # Pick largest face
         best_face = max(faces, key=lambda f: f[2] * f[3])
-        return tuple(map(int, best_face)), 0.8  # Fixed confidence for Haar 0.8 if found
+        logger.info(f"Face detected (Haar): {best_face}")
+        return tuple(map(int, best_face)), 0.8
 
     def _detect_dnn(
         self, frame: np.ndarray

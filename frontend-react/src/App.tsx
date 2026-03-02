@@ -414,7 +414,7 @@ const App: React.FC = () => {
     stopCamera(activeStreamRef.current);
     activeStreamRef.current = null;
 
-    if (finalResults && currentState.allHR.length >= 5) {
+    if (finalResults && currentState.allHR.length >= 3) {
       setResults(finalResults);
       setShowResults(true);
     } else {
