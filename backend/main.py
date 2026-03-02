@@ -243,7 +243,7 @@ if os.path.exists(_react_dist):
 
 
 # ─── REST Endpoints ───────────────────────────────────────────────────
-@app.get("/", response_class=FileResponse)
+@app.get("/", response_class=FileResponse, methods=["GET", "HEAD"])
 async def serve_frontend():
     """Serve the React frontend SPA."""
     react_index = os.path.join(_react_dist, "index.html")
@@ -252,21 +252,7 @@ async def serve_frontend():
     return {"message": "rPPG API Server", "docs": "/docs"}
 
 
-@app.get("/{full_path:path}", response_class=FileResponse, include_in_schema=False)
-async def spa_fallback(full_path: str):
-    """SPA catch-all: serve index.html for any unknown route (React Router support)."""
-    # Skip API and WebSocket paths
-    if full_path.startswith(("api/", "ws/", "health", "docs", "openapi")):
-        from fastapi import HTTPException as _HTTPException
-        raise _HTTPException(404)
-    react_index = os.path.join(_react_dist, "index.html")
-    if os.path.exists(react_index):
-        return FileResponse(react_index)
-    from fastapi import HTTPException as _HTTPException
-    raise _HTTPException(404)
-
-
-@app.get("/health", response_model=HealthCheckResponse)
+@app.get("/health", response_model=HealthCheckResponse, methods=["GET", "HEAD"])
 async def health_check():
     """Server health check."""
     return HealthCheckResponse(
@@ -304,6 +290,20 @@ async def reset_session(session_id: str):
     engine = session_manager.get_engine(session_id)
     engine.reset()
     return {"status": "reset", "session_id": session_id}
+
+
+@app.get("/{full_path:path}", response_class=FileResponse, include_in_schema=False)
+async def spa_fallback(full_path: str):
+    """SPA catch-all: serve index.html for any unknown route (React Router support)."""
+    # Skip API and WebSocket paths
+    if full_path.startswith(("api/", "ws/", "health", "docs", "openapi")):
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(404)
+    react_index = os.path.join(_react_dist, "index.html")
+    if os.path.exists(react_index):
+        return FileResponse(react_index)
+    from fastapi import HTTPException as _HTTPException
+    raise _HTTPException(404)
 
 
 # ─── Security Constants ──────────────────────────────────────────────
