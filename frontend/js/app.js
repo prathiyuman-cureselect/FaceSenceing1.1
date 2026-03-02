@@ -588,70 +588,69 @@ function showResultsScreen() {
         if (val === null || val === undefined) return { color: '#94a3b8', status: '' };
         switch (label) {
             case 'Heart Rate':
-                if (val >= 60 && val <= 100) return { color: '#10b981', status: 'Normal' };
-                return { color: '#ef4444', status: val < 60 ? 'Low' : 'High' };
+                if (val >= 60 && val <= 100) return { color: '#059669', status: 'Normal' };
+                return { color: '#dc2626', status: val < 60 ? 'Low' : 'High' };
             case 'SpO2':
-                if (val >= 95) return { color: '#10b981', status: 'Optimal' };
-                return { color: '#f59e0b', status: 'Low' };
+                if (val >= 95) return { color: '#059669', status: 'Optimal' };
+                return { color: '#d97706', status: 'Marginal' };
             case 'Hemoglobin':
-                if (val >= 13.5 && val <= 17.5) return { color: '#10b981', status: 'Normal' };
-                return { color: '#ef4444', status: 'Imbalanced' };
+                if (val >= 13.5 && val <= 17.5) return { color: '#059669', status: 'Normal' };
+                return { color: '#dc2626', status: 'Check' };
             case 'Glucose':
-                if (val < 140) return { color: '#10b981', status: 'Normal' };
-                return { color: '#f59e0b', status: 'Elevated' };
+                if (val < 140) return { color: '#059669', status: 'Normal' };
+                return { color: '#d97706', status: 'Elevated' };
             case 'Wellness Score':
-                if (val >= 7.5) return { color: '#10b981', status: 'Excellent' };
-                return { color: '#ef4444', status: 'Below Target' };
-            default: return { color: '#94a3b8', status: '' };
+                if (val >= 7.5) return { color: '#059669', status: 'Excellent' };
+                return { color: '#dc2626', status: 'Action' };
+            default: return { color: '#64748b', status: '' };
         }
     }
 
     const categories = [
         {
-            title: "Vital Signs",
+            title: "Observation: Physical Vitals",
             items: [
                 { icon: '❤️', label: 'Heart Rate', value: fmt(v.heart_rate), unit: 'BPM' },
-                { icon: '🌬️', label: 'Breathing Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
-                { icon: '🩺', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
-                { icon: '🩸', label: 'SpO2', value: fmt(v.spo2_estimate), unit: '%' },
-                { icon: '🌡️', label: 'Skin Temp', value: fmt(v.skin_temp, 1), unit: '°F' },
+                { icon: '🌬️', label: 'Respiratory Rate', value: fmt(v.respiratory_rate), unit: 'br/min' },
+                { icon: '�', label: 'Blood Pressure', value: `${fmt(v.blood_pressure_sys)}/${fmt(v.blood_pressure_dia)}`, unit: 'mmHg' },
+                { icon: '⭕', label: 'Oxygen Saturation', value: fmt(v.spo2_estimate), unit: '%' },
+                { icon: '🌡️', label: 'Skin Temperature', value: fmt(v.skin_temp, 1), unit: '°F' },
             ]
         },
         {
-            title: "Bloodless Blood Tests (AI)",
+            title: "Analysis: Metabolic Markers",
             items: [
-                { icon: '🧪', label: 'Hemoglobin', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
-                { icon: '🍬', label: 'Glucose', value: fmt(v.glucose), unit: 'mg/dL' },
-                { icon: '💉', label: 'HbA1c', value: fmt(v.hba1c, 1), unit: '%' },
-                { icon: '💧', label: 'Hydration', value: fmt(v.hydration, 1), unit: '/ 10' },
+                { icon: '🧪', label: 'Hemoglobin (Est)', value: fmt(v.hemoglobin, 1), unit: 'g/dL' },
+                { icon: '🍬', label: 'Glucose Trend', value: fmt(v.glucose), unit: 'mg/dL' },
+                { icon: '💉', label: 'HbA1c (Est)', value: fmt(v.hba1c, 1), unit: '%' },
+                { icon: '💧', label: 'Hydration Level', value: fmt(v.hydration, 1), unit: '/ 10' },
             ]
         },
         {
-            title: "Chronic Risk Factors",
+            title: "Risk Assessment: Cardio-Vascular",
             items: [
-                { icon: '⌛', label: 'Cardio Age', value: v.cardio_age || '--', unit: 'Years' },
-                { icon: '🛡️', label: 'Vascular Health', value: fmt(v.vascular_health), unit: '%' },
-                { icon: '📈', label: 'HTN Risk', value: v.htn_risk, unit: 'Level' },
+                { icon: '⌛', label: 'Cardiovascular Age', value: v.cardio_age || '--', unit: 'Years' },
+                { icon: '🛡️', label: 'Vascular Integrity', value: fmt(v.vascular_health), unit: '%' },
+                { icon: '📈', label: 'Hypertension Risk', value: v.htn_risk, unit: 'Level' },
                 { icon: '🏎️', label: 'Cardiac Index', value: fmt(v.cardiac_index, 2), unit: 'L/min/m²' },
             ]
         },
         {
-            title: "Mental Wellness",
+            title: "Psychological: ANS Balance",
             items: [
-                { icon: '🧠', label: 'Stress Index', value: fmt(v.stress_index), unit: 'SI' },
-                { icon: '⚡', label: 'Sympathetic', value: fmt(v.sympathetic_activity), unit: '%' },
-                { icon: '🧘', label: 'Parasympathetic', value: fmt(v.parasympathetic_activity), unit: '%' },
-                { icon: '💚', label: 'Wellness Score', value: fmt(v.wellness_score, 1), unit: '/ 10' },
+                { icon: '🧠', label: 'Stress Benchmark', value: fmt(v.stress_index), unit: 'SI' },
+                { icon: '⚡', label: 'Sympathetic Act.', value: fmt(v.sympathetic_activity), unit: '%' },
+                { icon: '🧘', label: 'Parasympathetic Act.', value: fmt(v.parasympathetic_activity), unit: '%' },
+                { icon: '💚', label: 'Wellness Quotient', value: fmt(v.wellness_score, 1), unit: '/ 10' },
             ]
         }
     ];
 
-    const confidenceColor = confidence >= 80 ? '#10b981' : (confidence >= 50 ? '#f59e0b' : '#ef4444');
+    const confidenceColor = confidence >= 80 ? '#059669' : (confidence >= 50 ? '#d97706' : '#dc2626');
     const estimatedAge = median(state.allAge);
     const genderCounts = {};
     state.allGender.forEach(g => { genderCounts[g] = (genderCounts[g] || 0) + 1; });
     const estimatedGender = Object.keys(genderCounts).sort((a, b) => genderCounts[b] - genderCounts[a])[0] || 'Unknown';
-    const genderIcon = estimatedGender === 'Male' ? '♂️' : (estimatedGender === 'Female' ? '♀️' : '👤');
     const genderColor = estimatedGender === 'Male' ? '#2563eb' : '#db2777';
 
     const now = new Date();
@@ -661,44 +660,42 @@ function showResultsScreen() {
     let innerHTML = `
         <div class="results-header">
             <div class="results-header-left">
-                <h2>Diagnostic Report</h2>
-                <div class="results-subtitle">Non-Invasive AI Wellness Analysis</div>
+                <h2>Health Diagnostic Report</h2>
+                <div class="results-subtitle">Personal AI-Assisted Assessment</div>
             </div>
             <div class="report-metadata">
-                <div><strong>Report ID:</strong> TG-${state.sessionId.toUpperCase()}</div>
-                <div><strong>Date:</strong> ${dateStr}</div>
-                <div><strong>Time:</strong> ${timeStr}</div>
+                <div><strong>CERTIFICATE NO:</strong> TG-${state.sessionId.toUpperCase()}</div>
+                <div><strong>ISSUED DATE:</strong> ${dateStr}</div>
+                <div><strong>TIMESTAMP:</strong> ${timeStr}</div>
             </div>
         </div>
 
         <div class="results-grid">
             <div class="result-card hero">
-                <div style="flex: 1; border-right: 1px solid #e2e8f0; padding-right: 20px;">
-                    <div class="result-label">AI Profile Estimation</div>
-                    <div style="display: flex; align-items: baseline; gap: 10px;">
-                        <span class="result-value">~${estimatedAge || '--'}</span>
-                        <span class="result-unit">Years Old</span>
-                    </div>
-                    <div style="margin-top: 10px; font-weight: 700; color: ${genderColor}">
-                        ${genderIcon} ${estimatedGender}
-                    </div>
+                <div class="hero-item">
+                    <div class="hero-label">Subject Identification</div>
+                    <div class="hero-value">${estimatedGender}</div>
+                    <div class="hero-sub">Gender Estimation</div>
                 </div>
-                <div style="flex: 1;">
-                    <div class="result-label">Data Confidence</div>
-                    <div class="result-value" style="color: ${confidenceColor}">${confidence}%</div>
-                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">
-                        Based on ${state.goodMeasurements} high-quality samples
-                    </div>
+                <div style="width: 1px; height: 40px; background: #e2e8f0;"></div>
+                <div class="hero-item">
+                    <div class="hero-label">Estimated Age</div>
+                    <div class="hero-value">~${estimatedAge || '--'}</div>
+                    <div class="hero-sub">Years (Biological Profile)</div>
+                </div>
+                <div style="width: 1px; height: 40px; background: #e2e8f0;"></div>
+                <div class="hero-item">
+                    <div class="hero-label">Data Accuracy</div>
+                    <div class="hero-value" style="color: ${confidenceColor}">${confidence}%</div>
+                    <div class="hero-sub">${state.goodMeasurements} / ${state.totalMeasurements} samples</div>
                 </div>
             </div>
     `;
 
     categories.forEach(cat => {
         innerHTML += `
-            <div style="grid-column: 1 / -1; margin-top: 20px; margin-bottom: 10px;">
-                <h4 style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px;">
-                    ${cat.title}
-                </h4>
+            <div style="grid-column: 1 / -1;" class="results-section-title">
+                ${cat.title}
             </div>
         `;
         cat.items.forEach(item => {
@@ -706,12 +703,12 @@ function showResultsScreen() {
             const info = getHealthMetricInfo(numVal, item.label);
             innerHTML += `
                 <div class="result-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                        <span style="font-size: 1.2rem;">${item.icon}</span>
-                        ${info.status ? `<span class="result-status" style="background: ${info.color}15; color: ${info.color};">${info.status}</span>` : ''}
+                    <div class="result-header-row">
+                        <span class="result-icon">${item.icon}</span>
+                        ${info.status ? `<span class="result-status-badge" style="background: ${info.color}15; color: ${info.color};">${info.status}</span>` : ''}
                     </div>
                     <div class="result-label">${item.label}</div>
-                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                    <div class="result-value-row">
                         <span class="result-value" style="${info.status ? `color: ${info.color}` : ''}">${item.value}</span>
                         <span class="result-unit">${item.unit}</span>
                     </div>
@@ -724,7 +721,7 @@ function showResultsScreen() {
     DOM.resultsGrid.innerHTML = innerHTML;
     DOM.resultsOverlay.classList.add('visible');
 
-    // Setup Print Button
+    // Attach print handler
     const btnPrint = document.getElementById('btnPrintReport');
     if (btnPrint) {
         btnPrint.onclick = () => window.print();
