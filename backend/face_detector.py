@@ -377,19 +377,20 @@ class FaceDetector:
             aspect_ratio = w / max(h, 1)
 
             # Estimate age from features
-            # Base age: start from 25
-            age = 25.0
-
+            # Base age: lowered to 22.0 to support young adults properly
+            age = 22.0
+ 
             # Wrinkle contribution (more wrinkles = older)
-            # Adjusted thresholds to be more sensitive to subtle wrinkles often lost in webcams
-            if laplacian_var > 600:
-                age += 25
-            elif laplacian_var > 300:
-                age += 15
-            elif laplacian_var > 150:
+            # RAISED THRESHOLDS: Webcam noise (grain) often looks like texture to LAPLACIAN.
+            # These are now doubled to avoid 'aging' the user unnecessarily.
+            if laplacian_var > 1200:
+                age += 28
+            elif laplacian_var > 700:
+                age += 18
+            elif laplacian_var > 450:
                 age += 8
-            elif laplacian_var < 40:
-                age -= 7  # Very smooth = younger
+            elif laplacian_var < 80:
+                age -= 2  # Very smooth = younger
 
             # Skin uniformity (less uniform = older)
             if skin_std > 40:
