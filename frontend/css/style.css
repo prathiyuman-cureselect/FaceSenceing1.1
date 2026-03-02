@@ -501,6 +501,69 @@ body::before {
     }
 }
 
+/* ─── Tactical Face Multi-Patch Overlay ─────────────────────────────── */
+#faceOverlaySvg path {
+    filter: drop-shadow(0 0 5px #3b82f6);
+    transition: all 0.1s ease-out;
+}
+
+#faceOverlaySvg rect {
+    animation: diagnosticGrid 2s infinite ease-in-out;
+    transform-origin: center;
+}
+
+@keyframes diagnosticGrid {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        stroke-opacity: 0.3;
+    }
+
+    50% {
+        opacity: 0.5;
+        stroke-opacity: 0.8;
+    }
+}
+
+.video-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 320px;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 120px;
+    pointer-events: none;
+    z-index: 5;
+    transition: all 0.5s ease;
+}
+
+.video-wrapper.face-detected::after {
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.1);
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+.video-wrapper.no-face::after {
+    border-color: rgba(239, 68, 68, 0.3);
+    animation: pulseRed 2s infinite;
+}
+
+@keyframes pulseRed {
+
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
 .buffer-label {
     font-size: 0.7rem;
     color: var(--text-muted);

@@ -1029,6 +1029,7 @@ function updateHeartbeatSpeed(bpm) {
 }
 
 // ─── Face Info Display on Video ──────────────────────────────────────
+// ─── Face Info Display on Video ──────────────────────────────────────
 function showFaceInfoOnVideo(age, gender) {
     let badge = document.getElementById('ageBadge');
     if (!badge) {
@@ -1052,6 +1053,76 @@ function showFaceInfoOnVideo(age, gender) {
         <span style="font-size: 0.75rem; opacity: 0.7;">FACE SCAN</span>
         <span>👤 ${ageText} · ${genderIcon} ${genderText}</span>
     `;
+}
+
+/**
+ * Tactical Face Overlay (Binah Style)
+ * Draws a high-tech frame and diagnostic grid patches.
+ */
+function drawFaceOverlay(x, y, w, h) {
+    let svg = document.getElementById('faceOverlaySvg');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'faceOverlaySvg';
+        svg.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;';
+        DOM.videoWrapper.appendChild(svg);
+    }
+
+    // Clear previous elements
+    svg.innerHTML = '';
+
+    // 1. Dynamic Corner Brackets
+    const padding = 20;
+    const cw = 40; // Corner width
+    const points = [
+        // Top Left
+        `M ${x - padding} ${y - padding + cw} V ${y - padding} H ${x - padding + cw}`,
+        // Top Right
+        `M ${x + w + padding - cw} ${y - padding} H ${x + w + padding} V ${y - padding + cw}`,
+        // Bottom Right
+        `M ${x + w + padding} ${y + h + padding - cw} V ${y + h + padding} H ${x + w + padding - cw}`,
+        // Bottom Left
+        `M ${x - padding + cw} ${y + h + padding} H ${x - padding} V ${y + h + padding - cw}`
+    ];
+
+    points.forEach(p => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', p);
+        path.setAttribute('stroke', '#3b82f6');
+        path.setAttribute('stroke-width', '3');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(path);
+    });
+
+    // 2. Multi-Patch diagnostic grid representation
+    // These match the backend ROI locations
+    const patches = [
+        // Forehead
+        { px: x + w * 0.3, py: y + h * 0.05, pw: w * 0.4, ph: h * 0.15, rows: 2, cols: 2 },
+        // L Cheek
+        { px: x + w * 0.15, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2, rows: 2, cols: 2 },
+        // R Cheek
+        { px: x + w * 0.65, py: y + h * 0.45, pw: w * 0.2, ph: h * 0.2, rows: 2, cols: 2 }
+    ];
+
+    patches.forEach(p => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', p.px);
+        rect.setAttribute('y', p.py);
+        rect.setAttribute('width', p.pw);
+        rect.setAttribute('height', p.ph);
+        rect.setAttribute('fill', 'rgba(59, 130, 246, 0.1)');
+        rect.setAttribute('stroke', 'rgba(59, 130, 246, 0.4)');
+        rect.setAttribute('stroke-width', '1');
+        rect.setAttribute('stroke-dasharray', '2,2');
+        svg.appendChild(rect);
+    });
+}
+
+function clearFaceOverlay() {
+    const svg = document.getElementById('faceOverlaySvg');
+    if (svg) svg.innerHTML = '';
 }
 
 
