@@ -59,15 +59,16 @@ class RPPGEngine:
 
         # Calibration & Scanning State
         self._is_calibrating = True
-        self._calibration_frames = 35  # Ultra-fast calibration (approx 3-4s at 10fps)
+        self._calibration_frames = 40  # Increase base for better initial stats
         self._calibration_progress = 0
-        self._age_history = []
-        self._gender_history = []
-        self._sentiment_history = []
         
         self._stable_age = None
         self._stable_gender = None
         self._stable_sentiment = None
+        
+        self._age_history: deque = deque(maxlen=30) # Increased history for stability check
+        self._gender_history: deque = deque(maxlen=20)
+        self._sentiment_history: deque = deque(maxlen=20)
         
         # Persistence tracking
         self._last_vitals: Optional[VitalSigns] = None
@@ -151,23 +152,27 @@ class RPPGEngine:
                 self._sentiment_history.append(est_sentiment)
             
             progress = (self._calibration_progress / self._calibration_frames) * 100
-            result.message = f"Scanning Face... {min(100, progress):.0f}%"
+            result.message = f"Smart Profile Lock... {min(100, progress):.0f}%"
             
+            # DYNAMIC LOCK: Wait for statistical stability (low variance)
             if self._calibration_progress >= self._calibration_frames:
-                self._is_calibrating = False
-                if self._age_history:
-                    self._stable_age = int(np.median(self._age_history))
-                if self._gender_history:
-                    self._stable_gender = max(set(self._gender_history), key=self._gender_history.count)
-                if self._sentiment_history:
-                    self._stable_sentiment = max(set(self._sentiment_history), key=self._sentiment_history.count)
-                else:
-                    self._stable_sentiment = "Neutral"
-                
-                # Report DETECTION_COMPLETE once, but keep updating stable values
-                result.message = "PHASE_DETECTION_COMPLETE"
-                self._face_lost_counter = 0 
-        
+                # Require at least 15 samples for a valid mean/std
+                if len(self._age_history) >= 15:
+                    age_std = np.std(self._age_history)
+                    # If age is stable (std < 4.0 years) or we've waited too long (100 frames)
+                    if age_std < 4.0 or self._calibration_progress > 100:
+                        self._is_calibrating = False
+                        self._stable_age = int(np.median(self._age_history))
+                        self._stable_gender = str(max(set(self._gender_history), key=self._gender_history.count))
+                        self._stable_sentiment = str(max(set(self._sentiment_history), key=self._sentiment_history.count))
+                        
+                        # Report DETECTION_COMPLETE only when TRULY stable
+                        result.message = "PHASE_DETECTION_COMPLETE"
+                        self._face_lost_counter = 0 
+                elif self._calibration_progress > 120:
+                    # Absolute failsafe for very noisy environments
+                    self._is_calibrating = False
+                    result.message = "PHASE_DETECTION_COMPLETE"        
         if self._age_history:
             self._stable_age = int(np.median(self._age_history))
         if self._gender_history:

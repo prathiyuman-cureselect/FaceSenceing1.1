@@ -272,8 +272,16 @@ const App: React.FC = () => {
     setTimerText('🔬 Step 1: Face Detection...');
 
     fastUIRef.current = setInterval(() => {
-      if (scanStateRef.current.scanPhase === 'face') {
-        setTimerText(faceParts[Math.min(facePartIdx, faceParts.length - 1)]);
+      const state = scanStateRef.current;
+      if (state.scanPhase === 'face') {
+        const msg = state.message;
+        if (msg.includes('DETECTION_COMPLETE')) {
+          setTimerText('⚡ Precision Lock Achieved. Sensing Physiological Signal...');
+        } else if (msg.includes('Smart Profile Lock')) {
+          setTimerText(msg);
+        } else {
+          setTimerText(faceParts[Math.min(facePartIdx % faceParts.length, faceParts.length - 1)]);
+        }
         facePartIdx++;
       } else {
         clearInterval(fastUIRef.current!);
@@ -310,8 +318,8 @@ const App: React.FC = () => {
         setTimerText('✅ Scan Window Complete!');
         autoCompleteSession();
       } else {
-        // Failsafe: if we've been scanning for >8s and still in 'face' phase, force 'vitals'
-        if (scanStateRef.current.scanPhase === 'face' && elapsed > 8) {
+        // Precision Lock Failsafe
+        if (scanStateRef.current.scanPhase === 'face' && elapsed > 12) {
           setScanState(prev => ({ ...prev, scanPhase: 'vitals' }));
         }
 

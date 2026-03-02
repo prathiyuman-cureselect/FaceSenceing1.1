@@ -345,14 +345,16 @@ class FaceDetector:
             # Convert to grayscale
             gray_full = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
             
-            # Use minimal blur for texture analysis to preserve wrinkles
-            gray_texture = cv2.GaussianBlur(gray_full, (3, 3), 0)
+            # NOISE SUPPRESSION: Webcams have significant grain/noise in low light
+            # that Laplacian reads as 'wrinkles'. Use Bilateral filter to preserve edges
+            # (true wrinkles) while smoothing CCD noise (grain).
+            gray_smooth = cv2.bilateralFilter(gray_full, 5, 50, 50)
             
             # 1. Wrinkle/texture score — Laplacian variance (higher = more detail/wrinkles)
             # Forehead is a prime area for wrinkles
             fh_y1, fh_y2 = 0, h // 4
             fh_x1, fh_x2 = w // 4, 3 * w // 4
-            forehead_region = gray_texture[fh_y1:fh_y2, fh_x1:fh_x2]
+            forehead_region = gray_smooth[fh_y1:fh_y2, fh_x1:fh_x2]
             
             if forehead_region.size == 0:
                 return None
@@ -381,15 +383,15 @@ class FaceDetector:
             age = 22.0
  
             # Wrinkle contribution (more wrinkles = older)
-            # RAISED THRESHOLDS: Webcam noise (grain) often looks like texture to LAPLACIAN.
-            # These are now doubled to avoid 'aging' the user unnecessarily.
-            if laplacian_var > 1200:
+            # RAISED THRESHOLDS: With bilateral filtering, we only catch thick wrinkles.
+            # Webcam noise (grain) is now filtered out.
+            if laplacian_var > 1800:
                 age += 28
-            elif laplacian_var > 700:
+            elif laplacian_var > 1000:
                 age += 18
-            elif laplacian_var > 450:
+            elif laplacian_var > 600:
                 age += 8
-            elif laplacian_var < 80:
+            elif laplacian_var < 150:
                 age -= 2  # Very smooth = younger
 
             # Skin uniformity (less uniform = older)
