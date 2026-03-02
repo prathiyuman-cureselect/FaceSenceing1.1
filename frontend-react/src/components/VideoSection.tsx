@@ -1,0 +1,150 @@
+import React, { useEffect, useRef } from 'react';
+import { drawFaceOverlay } from '../utils/canvas';
+
+interface VideoSectionProps {
+    videoRef: React.RefObject<HTMLVideoElement | null>;
+    canvasRef: React.RefObject<HTMLCanvasElement | null>;
+    isRunning: boolean;
+    faceDetected: boolean;
+    faceRect: [number, number, number, number] | null;
+    bufferFill: number;
+    timerText: string;
+    qualityText: string;
+    estimatedAge: number | null;
+    estimatedGender: string | null;
+    onStop: () => void;
+    onReset: () => void;
+}
+
+const VideoSection: React.FC<VideoSectionProps> = ({
+    videoRef,
+    canvasRef,
+    isRunning,
+    faceDetected,
+    faceRect,
+    bufferFill,
+    timerText,
+    qualityText,
+    estimatedAge,
+    estimatedGender,
+    onStop,
+    onReset,
+}) => {
+    const svgRef = useRef<SVGSVGElement | null>(null);
+
+    // Draw face overlay when face rect changes
+    useEffect(() => {
+        if (!svgRef.current) return;
+        if (faceRect) {
+            const [x, y, w, h] = faceRect;
+            drawFaceOverlay(svgRef.current, x, y, w, h);
+        } else {
+            svgRef.current.innerHTML = '';
+        }
+    }, [faceRect]);
+
+    const wrapperClass = `video-wrapper ${faceDetected ? 'face-detected' : isRunning ? 'no-face' : ''}`;
+
+    const genderIcon =
+        estimatedGender === 'Male'
+            ? '♂️'
+            : estimatedGender === 'Female'
+                ? '♀️'
+                : '';
+
+    return (
+        <section
+            className="card video-section"
+            aria-label="Live camera feed"
+        >
+            <div className="card-header">
+                <span className="card-title">
+                    <span aria-hidden="true">📹</span> Live Camera Feed
+                </span>
+                <div className="controls">
+                    <button
+                        className="btn btn-ghost"
+                        id="btnReset"
+                        onClick={onReset}
+                        title="Reset signal buffers"
+                        aria-label="Reset signal buffers"
+                    >
+                        ↻ Reset
+                    </button>
+                    <button
+                        className="btn btn-danger"
+                        id="btnStop"
+                        onClick={onStop}
+                        title="Stop analysis"
+                        aria-label="Stop analysis"
+                    >
+                        ⏹ Stop
+                    </button>
+                </div>
+            </div>
+
+            <div className={wrapperClass}>
+                {/* Video element */}
+                <video
+                    id="videoFeed"
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    aria-label="Camera feed"
+                />
+
+                {/* Hidden capture canvas */}
+                <canvas ref={canvasRef} style={{ display: 'none' }} aria-hidden="true" />
+
+                {/* Face SVG overlay */}
+                <svg
+                    ref={svgRef}
+                    className="face-overlay-svg"
+                    aria-hidden="true"
+                />
+
+                {/* Age / Gender badge */}
+                {(estimatedAge || estimatedGender) && isRunning && (
+                    <div className="age-badge" aria-label="Detected face info">
+                        <span className="age-badge-sub">FACE SCAN</span>
+                        <span>
+                            👤 {estimatedAge ? `~${estimatedAge} yrs` : '...'} · {genderIcon}{' '}
+                            {estimatedGender || '...'}
+                        </span>
+                    </div>
+                )}
+
+                {/* Status chips */}
+                <div className="video-status">
+                    {isRunning && (
+                        <div className="status-chip recording" role="status">
+                            <span className="rec-dot" aria-hidden="true" />
+                            ANALYZING
+                        </div>
+                    )}
+                    {isRunning && timerText && (
+                        <div className="status-chip timer" role="timer">
+                            ⏱ {timerText}
+                        </div>
+                    )}
+                    {qualityText && (
+                        <div className="status-chip quality" role="status">
+                            {qualityText}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Buffer progress */}
+            <div className="buffer-bar" role="progressbar" aria-valuenow={bufferFill} aria-valuemin={0} aria-valuemax={100}>
+                <div className="buffer-fill" style={{ width: `${bufferFill}%` }} />
+            </div>
+            <div className="buffer-label" aria-live="polite">
+                Buffer: {Math.round(bufferFill)}%
+            </div>
+        </section>
+    );
+};
+
+export default VideoSection;

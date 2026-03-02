@@ -207,23 +207,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend static files
+# ─── Static File Serving ─────────────────────────────────────────────
+# Priority: React production build (frontend-dist/) > legacy frontend/
 import os
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(frontend_dir):
-    app.mount("/css", StaticFiles(directory=os.path.join(frontend_dir, "css")), name="css")
-    app.mount("/js", StaticFiles(directory=os.path.join(frontend_dir, "js")), name="js")
-    app.mount("/asserts", StaticFiles(directory=os.path.join(frontend_dir, "asserts")), name="asserts")
+
+_root = os.path.dirname(os.path.dirname(__file__))
+_react_dist = os.path.join(_root, "frontend-dist")
+_legacy_dir = os.path.join(_root, "frontend")
+
+# Serve React build assets (JS, CSS chunks, images etc.)
+if os.path.exists(_react_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_react_dist, "assets")), name="assets")
+    # Public assets (logo, images)
+    _asserts_in_dist = os.path.join(_react_dist, "asserts")
+    if os.path.exists(_asserts_in_dist):
+        app.mount("/asserts", StaticFiles(directory=_asserts_in_dist), name="asserts")
+elif os.path.exists(_legacy_dir):
+    # Fallback: legacy plain-HTML build
+    app.mount("/css", StaticFiles(directory=os.path.join(_legacy_dir, "css")), name="css")
+    app.mount("/js",  StaticFiles(directory=os.path.join(_legacy_dir, "js")),  name="js")
+    app.mount("/asserts", StaticFiles(directory=os.path.join(_legacy_dir, "asserts")), name="asserts")
 
 
 # ─── REST Endpoints ───────────────────────────────────────────────────
 @app.get("/", response_class=FileResponse)
 async def serve_frontend():
-    """Serve the frontend dashboard."""
-    index_path = os.path.join(frontend_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
+    """Serve the React frontend SPA."""
+    # React dist takes priority over legacy
+    react_index = os.path.join(_react_dist, "index.html")
+    if os.path.exists(react_index):
+        return FileResponse(react_index)
+    legacy_index = os.path.join(_legacy_dir, "index.html")
+    if os.path.exists(legacy_index):
+        return FileResponse(legacy_index)
     return {"message": "rPPG API Server", "docs": "/docs"}
+
+
+@app.get("/{full_path:path}", response_class=FileResponse, include_in_schema=False)
+async def spa_fallback(full_path: str):
+    """SPA catch-all: serve index.html for any unknown route (React Router support)."""
+    # Skip API and WebSocket paths
+    if full_path.startswith(("api/", "ws/", "health", "docs", "openapi")):
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(404)
+    react_index = os.path.join(_react_dist, "index.html")
+    if os.path.exists(react_index):
+        return FileResponse(react_index)
+    from fastapi import HTTPException as _HTTPException
+    raise _HTTPException(404)
 
 
 @app.get("/health", response_model=HealthCheckResponse)
