@@ -260,10 +260,19 @@ class RPPGEngine:
             motion_score=self._motion_score,
         )
 
-        # Final Rejection Logic — Prevent "Abnormal" data
-        if quality.overall_level == SignalQualityLevel.REJECTED or vitals.heart_rate is None:
-            result.message = "Poor signal quality. Checking..."
+        # Final Rejection Logic — Only reject if no signal at all or extremely noisy
+        if quality.overall_level == SignalQualityLevel.REJECTED:
+            if not vitals.heart_rate:
+                result.message = "Searching for pulse... keep still"
+                return result
+            # If we have a heart rate but quality is REJECTED, we still send it
+            # but keep the message as Poor quality.
+            result.message = "Signal quality: REJECTED"
+        elif not vitals.heart_rate:
+            result.message = "Calculating vitals..."
             return result
+        else:
+            result.message = f"Quality: {quality.overall_level.value.upper()}"
         
         # Stability check & Temporal Smoothing (Binah style)
         if 40 <= vitals.heart_rate <= 160:

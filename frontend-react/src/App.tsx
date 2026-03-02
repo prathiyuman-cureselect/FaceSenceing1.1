@@ -414,13 +414,14 @@ const App: React.FC = () => {
     stopCamera(activeStreamRef.current);
     activeStreamRef.current = null;
 
-    if (finalResults) {
+    if (finalResults && currentState.allHR.length >= 5) {
       setResults(finalResults);
       setShowResults(true);
     } else {
-      alert(
-        'No data was captured. Please try again with good lighting and stay completely still.',
-      );
+      const msg = currentState.allHR.length > 0
+        ? "Not enough stable data was captured (need at least 15 seconds of clean signal). Please stay completely still in a well-lit area."
+        : "No vitals data was captured. Please ensure your face is clearly visible and stay still.";
+      alert(`⚠️ SCAN INCOMPLETE\n\n${msg}`);
       setStartupHidden(false);
     }
   }, [stopFrameCapture, buildResults, stopCamera]);

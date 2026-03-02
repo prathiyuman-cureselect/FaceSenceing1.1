@@ -1347,3 +1347,58 @@ video#videoFeed {
     transform: rotate(360deg);
   }
 }
+
+/* ─── Scanning Animation ────────────────────────────────────────────── */
+
+.scanning-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, transparent, var(--primary-color), transparent);
+  box-shadow: 0 0 15px var(--primary-color);
+  opacity: 0.7;
+  z-index: 5;
+  pointer-events: none;
+  animation: scan-move 3s ease-in-out infinite;
+}
+
+@keyframes scan-move {
+
+  0%,
+  100% {
+    top: 10%;
+  }
+
+  50% {
+    top: 90%;
+  }
+}
+
+.face-lock-active {
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  transition: border-color 0.3s ease;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.face-detected .face-lock-active {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.1);
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

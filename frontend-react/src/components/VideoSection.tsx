@@ -125,6 +125,10 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
                     aria-hidden="true"
                 />
 
+                {/* Scanning Animation Components */}
+                {isRunning && <div className="scanning-line" aria-hidden="true" />}
+                <div className="face-lock-active" aria-hidden="true" />
+
                 {/* Age / Gender badge */}
                 {(estimatedAge || estimatedGender) && isRunning && (
                     <div className="age-badge" aria-label="Detected face info">
@@ -152,6 +156,11 @@ const VideoSection: React.FC<VideoSectionProps> = memo(({
                     {qualityText && (
                         <div className="status-chip quality" role="status">
                             {qualityText}
+                        </div>
+                    )}
+                    {faceDetected && isRunning && (
+                        <div className="status-chip face-lock" style={{ background: 'var(--primary-color)', color: 'white' }}>
+                            ⚡ SENSING...
                         </div>
                     )}
                 </div>
