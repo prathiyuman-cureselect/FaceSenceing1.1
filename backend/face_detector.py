@@ -155,52 +155,84 @@ class FaceDetector:
 
     def extract_roi(
         self, frame: np.ndarray, face_rect: Tuple[int, int, int, int]
-    ) -> Dict[str, np.ndarray]:
+    ) -> Dict[str, List[np.ndarray]]:
         """
-        Extract refined Forehead and Cheek ROIs.
-        Avoids the T-zone (eyes/nose) which contains high specular reflection.
+        Extract sub-grid ROIs for spatial-temporal signal filtering.
+        Divides forehead and cheeks into multiple patches to allow for
+        Quality-Based spatial averaging (similar to commercial grade rPPG).
         """
         x, y, w, h = face_rect
         h_orig, w_orig = frame.shape[:2]
 
-        # 1. Forehead: Central top part of the face
-        fh_y1 = max(0, y + int(h * 0.05))
-        fh_y2 = y + int(h * 0.22)
-        fh_x1 = x + int(w * 0.3)
-        fh_x2 = x + int(w * 0.7)
+        def get_patches(x1, y1, x2, y2, grid_size=(2, 2)):
+            """Divide a region into a grid of patches."""
+            patches = []
+            x1, x2 = max(0, x1), min(w_orig, x2)
+            y1, y2 = max(0, y1), min(h_orig, y2)
+            
+            if x2 <= x1 or y2 <= y1: return []
+            
+            pw = (x2 - x1) // grid_size[0]
+            ph = (y2 - y1) // grid_size[1]
+            
+            for i in range(grid_size[0]):
+                for j in range(grid_size[1]):
+                    px1 = x1 + i * pw
+                    py1 = y1 + j * ph
+                    px2 = px1 + pw
+                    py2 = py1 + ph
+                    patch = frame[py1:py2, px1:px2]
+                    if patch.size > 0:
+                        patches.append(patch)
+            return patches
+
+        # Define 3 core capture zones
+        # 1. Forehead (divided into 4 patches)
+        forehead_patches = get_patches(
+            x + int(w * 0.3), y + int(h * 0.05),
+            x + int(w * 0.7), y + int(h * 0.20),
+            (2, 2)
+        )
         
-        # 2. Left Cheek: Center-left
-        lc_y1 = y + int(h * 0.45)
-        lc_y2 = y + int(h * 0.70)
-        lc_x1 = x + int(w * 0.15)
-        lc_x2 = x + int(w * 0.35)
+        # 2. Left Cheek (divided into 4 patches)
+        l_cheek_patches = get_patches(
+            x + int(w * 0.15), y + int(h * 0.45),
+            x + int(w * 0.35), y + int(h * 0.65),
+            (2, 2)
+        )
 
-        # 3. Right Cheek: Center-right
-        rc_y1 = y + int(h * 0.45)
-        rc_y2 = y + int(h * 0.70)
-        rc_x1 = x + int(w * 0.65)
-        rc_x2 = x + int(w * 0.85)
+        # 3. Right Cheek (divided into 4 patches)
+        r_cheek_patches = get_patches(
+            x + int(w * 0.65), y + int(h * 0.45),
+            x + int(w * 0.85), y + int(h * 0.65),
+            (2, 2)
+        )
 
-        rois = {
-            "forehead": frame[fh_y1:fh_y2, max(0, fh_x1):min(w_orig, fh_x2)],
-            "left_cheek": frame[max(0, lc_y1):min(h_orig, lc_y2), max(0, lc_x1):min(w_orig, lc_x2)],
-            "right_cheek": frame[max(0, rc_y1):min(h_orig, rc_y2), max(0, rc_x1):min(w_orig, rc_x2)],
+        return {
+            "forehead": forehead_patches,
+            "left_cheek": l_cheek_patches,
+            "right_cheek": r_cheek_patches
         }
-        
-        return rois
 
     def get_skin_mask(self, roi: np.ndarray) -> np.ndarray:
         """
-        Precise skin-color mask using YCrCb.
+        Ultra-precise skin-color verification using dual-space (YCrCb + HSV) masking.
+        Excludes lips, eyes, and shadows which contaminate rPPG signals.
         """
         if roi.size == 0:
             return np.array([])
 
+        # Space 1: YCrCb
         ycrcb = cv2.cvtColor(roi, cv2.COLOR_BGR2YCrCb)
-        # Tighter range for skin-only detection to avoid lips or shadows
-        mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
+        mask1 = cv2.inRange(ycrcb, (0, 133, 85), (255, 170, 125))
 
-        # Morphological cleanup
+        # Space 2: HSV
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        mask2 = cv2.inRange(hsv, (0, 30, 60), (20, 150, 255))
+
+        mask = cv2.bitwise_and(mask1, mask2)
+
+        # Morphological cleanup to remove small noise
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 

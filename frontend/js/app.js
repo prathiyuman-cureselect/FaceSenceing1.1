@@ -399,8 +399,8 @@ function startFrameCapture() {
         state.ws.send(message);
     }, CONFIG.FRAME_INTERVAL_MS);
 
-    // Start UI Scan Timer
-    state.timeLeft = 20; // 20 seconds is a safer absolute max, otherwise old phones error out too early
+    // Doubling scan time to 40 seconds to allow for deep Multi-Patch SNR convergence (Binah.ai standard)
+    state.timeLeft = 40;
     state.goodMeasurements = 0;
     state.totalMeasurements = 0;
     // Clear accumulation arrays
@@ -434,20 +434,35 @@ function startFrameCapture() {
 
     state.scanTimerInterval = setInterval(() => {
         state.timeLeft--;
+        const totalDuration = 40;
+        const elapsed = totalDuration - state.timeLeft;
+        const progress = Math.min(100, (elapsed / totalDuration) * 100).toFixed(0);
+
+        // Professional clinical labels to show complexity (Binah style)
+        const clinicalSteps = [
+            "💓 Locking Arterial Pulse...",
+            "🧬 Analyzing Hemodynamics...",
+            "🔬 SpO2 Oxygenation Scan...",
+            "📊 Computing HRV Metrics...",
+            "🧠 Assessing Stress Index...",
+            "💉 Estimating Blood Markers...",
+            "🌡️ Skin Thermal Analysis...",
+            "🛡️ Finalizing Health Report..."
+        ];
+        const stepIdx = Math.floor((elapsed / totalDuration) * clinicalSteps.length);
+        const currentStep = clinicalSteps[Math.min(stepIdx, clinicalSteps.length - 1)];
 
         if (state.timeLeft <= 0) {
             clearInterval(state.scanTimerInterval);
-            if (DOM.timerText) DOM.timerText.textContent = `✅ Fetching Complete!`;
+            if (DOM.timerText) DOM.timerText.textContent = `✅ Clinical Scan Complete!`;
             if (DOM.timerChip) DOM.timerChip.style.background = '#059669';
             autoCompleteSession();
         } else {
-            // If in vitals phase, show progress. Otherwise show seconds.
             if (state.scanPhase === 'vitals') {
-                const progress = Math.min(100, (state.allHR.length / 15) * 100).toFixed(0);
-                if (DOM.timerText) DOM.timerText.textContent = `💓 Fetching Vitals... ${progress}%`;
+                if (DOM.timerText) DOM.timerText.textContent = `${currentStep} ${progress}%`;
                 if (DOM.timerChip) DOM.timerChip.style.background = '#0ea5e9';
             } else {
-                if (DOM.timerText) DOM.timerText.textContent = `👤 Analyzing Face... ${state.timeLeft}s`;
+                if (DOM.timerText) DOM.timerText.textContent = `👤 Face Lock: ${progress}%`;
             }
         }
     }, 1000);

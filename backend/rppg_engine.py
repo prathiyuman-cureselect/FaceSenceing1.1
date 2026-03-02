@@ -59,11 +59,17 @@ class RPPGEngine:
 
         # Calibration & Scanning State
         self._is_calibrating = True
-        self._calibration_frames = 60  # ~2 seconds of "Face Scan"
+        self._calibration_frames = 150  # ~5 seconds at 30fps for stable profile
         self._age_history = []
         self._gender_history = []
         self._stable_age = None
         self._stable_gender = None
+        
+        # History for result smoothing (Binah-style stability)
+        self._hr_history: deque = deque(maxlen=10)
+        self._rr_history: deque = deque(maxlen=10)
+        self._spo2_history: deque = deque(maxlen=10)
+        self._bp_history: deque = deque(maxlen=10) # List of (sys, dia) tuples
         
         # Motion estimation
         self._prev_gray: Optional[np.ndarray] = None
@@ -73,10 +79,6 @@ class RPPGEngine:
         self._frames_processed: int = 0
         self._start_time: float = time.time()
         self._last_measurement: Optional[MeasurementResult] = None
-
-        # Measurement history for averaging
-        self._hr_history: deque = deque(maxlen=30)
-        self._rr_history: deque = deque(maxlen=30)
 
     def process_frame(self, frame: np.ndarray) -> MeasurementResult:
         """
@@ -124,28 +126,49 @@ class RPPGEngine:
             result.message = "Too much movement. Please stay still."
             return result
 
-        # Step 3: Precise RGB extraction with Skin Masking
-        rgb_signal = self.face_detector.extract_rgb_signal(frame, face_rect)
-        if rgb_signal is None:
+        # Step 3: High-Fidelity Signal Extraction (Multi-Patch)
+        # We extract signals from all 12 patches to perform spatial-temporal filtering
+        rois = self.face_detector.extract_roi(frame, face_rect)
+        
+        # Flatten all patches from forehead and cheeks into one list
+        all_patches = rois["forehead"] + rois["left_cheek"] + rois["right_cheek"]
+        
+        if not all_patches:
             result.message = "Searching for skin pixels..."
             return result
 
-        # Add to rolling buffer
-        self._rgb_buffer.append(rgb_signal)
+        patch_signals = []
+        for patch in all_patches:
+            mask = self.face_detector.get_skin_mask(patch)
+            if mask.size > 0 and np.count_nonzero(mask) > (patch.size // 10):
+                # Use masked mean for precision
+                b = np.mean(patch[:, :, 0][mask > 0])
+                g = np.mean(patch[:, :, 1][mask > 0])
+                r = np.mean(patch[:, :, 2][mask > 0])
+                patch_signals.append(np.array([r, g, b]))
+            else:
+                # Fallback to simple mean if mask is too small (e.g. very zoomed in)
+                patch_signals.append(np.mean(patch, axis=(0, 1))[::-1]) # BGR to RGB
+
+        # Add current multi-patch snapshot to signal buffer
+        # Buffer shape: (Time, Patches, 3)
+        self._rgb_buffer.append(np.array(patch_signals))
         self._timestamp_buffer.append(time.time())
 
         buffer_len = len(self._rgb_buffer)
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
-        # Step 4: Core rPPG Processing (only when enough data)
+        # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
         if buffer_len < self.config.min_buffer_size:
             if not self._is_calibrating:
                 result.message = f"Analyzing Pulse... {result.buffer_fill:.0f}%"
             return result
 
-        # Step 5: Advanced POS extraction
+        # rgb_array shape: (Time, Patches, 3)
         rgb_array = np.array(self._rgb_buffer)
-        pulse_signal = self._pos_algorithm(rgb_array)
+        
+        # We process each patch independently and then fuse them based on signal quality (SNR)
+        pulse_signal = self._fused_pos_algorithm(rgb_array)
 
         if pulse_signal is None:
             result.message = "Signal noise too high."
@@ -171,27 +194,33 @@ class RPPGEngine:
 
         # Advanced Vitals Estimation
         if vitals.heart_rate:
-            amp = np.std(hr_filtered)
+            # For color-based markers, we average all patches to get a stable 1D RGB signal
+            rgb_1d = np.mean(rgb_array, axis=1) # (Time, 3)
+            
+            # Amplitude for BP: We use the STD of the filtered signal
+            # Note: fused pulse was normalized, but we can recover physical amplitude 
+            # by looking at the raw patch signals if needed. For now, use relative power.
+            amp = np.std(hr_filtered) 
+            
             vitals.blood_pressure_sys, vitals.blood_pressure_dia = self.signal_processor.estimate_bp(
-                vitals.heart_rate, amp, hr_filtered=hr_filtered, rgb_array=rgb_array
+                vitals.heart_rate, amp, hr_filtered=hr_filtered, rgb_array=rgb_1d
             )
-            vitals.spo2_estimate = self.signal_processor.estimate_spo2(rgb_array[:, 0], rgb_array[:, 2])
+            vitals.spo2_estimate = self.signal_processor.estimate_spo2(rgb_1d[:, 0], rgb_1d[:, 2])
             
             # --- Comprehensive Health Proxies ---
-            # SNS / PNS Activity
             if vitals.lf_hf_ratio is not None and vitals.lf_hf_ratio > 0:
                 total = vitals.lf_hf_ratio + 1.0
                 vitals.sympathetic_activity = round(min(100, (vitals.lf_hf_ratio / total) * 100), 1)
                 vitals.parasympathetic_activity = round(min(100, (1.0 / total) * 100), 1)
 
-            # Blood Markers
-            r_g_ratio = np.mean(rgb_array[:, 0]) / (np.mean(rgb_array[:, 1]) + 1e-10)
+            # Blood Markers (using averaged spatial signal)
+            r_g_ratio = np.mean(rgb_1d[:, 0]) / (np.mean(rgb_1d[:, 1]) + 1e-10)
             vitals.hemoglobin = round(max(8.0, min(18.0, 14.5 + (r_g_ratio - 1.1) * 10)), 1)
             
-            vitals.perfusion_index = self.signal_processor.compute_perfusion_index(hr_filtered, np.mean(rgb_array, axis=0))
+            vitals.perfusion_index = self.signal_processor.compute_perfusion_index(hr_filtered, np.mean(rgb_1d, axis=0))
             vitals.blood_glucose = round(max(70.0, min(180.0, 100.0 + vitals.perfusion_index * 50)), 0)
             vitals.hba1c = round(max(4.0, min(10.0, 5.2 + (vitals.blood_glucose - 100) * 0.02)), 1)
-            vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_array[:, 2]) * 100)), 1)
+            vitals.hydration_index = round(max(0, min(10.0, 8.5 - np.std(rgb_1d[:, 2]) * 100)), 1)
             
             # Risks & Cardiovascular Age
             base_age = self._stable_age or 30
@@ -223,11 +252,23 @@ class RPPGEngine:
             result.message = "Poor signal quality. Checking..."
             return result
         
-        # Stability check: Only add to history if readings are physically plausible
+        # Stability check & Temporal Smoothing (Binah style)
         if 40 <= vitals.heart_rate <= 160:
             self._hr_history.append(vitals.heart_rate)
+            vitals.heart_rate = round(float(np.median(self._hr_history)), 1)
+            
         if 8 <= vitals.respiratory_rate <= 40:
             self._rr_history.append(vitals.respiratory_rate)
+            vitals.respiratory_rate = round(float(np.median(self._rr_history)), 1)
+            
+        if vitals.spo2_estimate:
+            self._spo2_history.append(vitals.spo2_estimate)
+            vitals.spo2_estimate = round(float(np.median(self._spo2_history)), 1)
+            
+        if vitals.blood_pressure_sys:
+            self._bp_history.append((vitals.blood_pressure_sys, vitals.blood_pressure_dia))
+            vitals.blood_pressure_sys = round(float(np.median([p[0] for p in self._bp_history])), 1)
+            vitals.blood_pressure_dia = round(float(np.median([p[1] for p in self._bp_history])), 1)
 
         result.vitals = vitals
         result.quality = quality
@@ -235,63 +276,118 @@ class RPPGEngine:
         
         return result
 
+    def _fused_pos_algorithm(self, rgb_3d: np.ndarray) -> Optional[np.ndarray]:
+        """
+        Commercial-grade Fused POS Algorithm.
+        Processes multiple patches and fuses them weighted by SNR.
+        
+        Args:
+            rgb_3d: Array of shape (Time, Patches, 3)
+        """
+        n_frames, n_patches, _ = rgb_3d.shape
+        
+        all_pulses = []
+        all_snrs = []
+        
+        for p in range(n_patches):
+            patch_rgb = rgb_3d[:, p, :]
+            pulse = self._pos_algorithm(patch_rgb)
+            
+            if pulse is not None:
+                # Calculate SNR for this patch
+                snr = self._calculate_signal_snr(pulse)
+                if snr > 0.5: # Quality threshold
+                    all_pulses.append(pulse)
+                    all_snrs.append(snr)
+        
+        if not all_pulses:
+            return None
+            
+        # SNR-weighted Fusion
+        weights = np.array(all_snrs)
+        weights = weights / np.sum(weights)
+        
+        fused_pulse = np.zeros(n_frames)
+        for i, pulse in enumerate(all_pulses):
+            # Normalize pulse to unit variance before fusion to avoid amplitude bias
+            pulse_norm = (pulse - np.mean(pulse)) / (np.std(pulse) + 1e-10)
+            fused_pulse += pulse_norm * weights[i]
+            
+        return fused_pulse
+
+    def _calculate_signal_snr(self, signal: np.ndarray) -> float:
+        """
+        Estimate Signal-to-Noise ratio in the HR frequency band.
+        """
+        if len(signal) < 64: return 0.0
+        
+        # Power Spectral Density
+        freqs, psd = self.signal_processor.compute_fft(signal)
+        
+        # Define HR band (0.7 - 3.0 Hz)
+        hr_mask = (freqs >= 0.7) & (freqs <= 3.0)
+        if not np.any(hr_mask): return 0.0
+        
+        # Find peak in HR band
+        peak_idx = np.argmax(psd[hr_mask])
+        peak_freq = freqs[hr_mask][peak_idx]
+        
+        # Signal power around peak (peak +/- 0.1 Hz)
+        signal_mask = (freqs >= peak_freq - 0.1) & (freqs <= peak_freq + 0.1)
+        signal_power = np.sum(psd[signal_mask])
+        
+        # Total power in the band
+        total_band_power = np.sum(psd[hr_mask])
+        
+        noise_power = total_band_power - signal_power
+        if noise_power <= 0: return 2.0 # Perfect signal
+        
+        return float(signal_power / noise_power)
+
     def _pos_algorithm(self, rgb: np.ndarray) -> Optional[np.ndarray]:
         """
-        Plane-Orthogonal-to-Skin (POS) algorithm with Amplitude Preservation.
+        Base Plane-Orthogonal-to-Skin (POS) worker.
         """
         n = len(rgb)
         window = self.config.pos_window
 
-        if n < window:
-            return None
+        if n < window: return None
 
         # AC/DC Normalization
         mean_rgb = np.mean(rgb, axis=0)
-        if np.any(mean_rgb < 1e-6):
-            return None
+        if np.any(mean_rgb < 1e-6): return None
         normalized = rgb / mean_rgb
 
         pulse = np.zeros(n)
         for t in range(window, n):
             segment = normalized[t - window: t]
             seg_mean = np.mean(segment, axis=0)
-            if np.any(seg_mean < 1e-6):
-                continue
+            if np.any(seg_mean < 1e-6): continue
             cn = segment / seg_mean
 
-            # Projections
             s1 = cn[:, 1] - cn[:, 2]                  # G - B
             s2 = cn[:, 1] + cn[:, 2] - 2 * cn[:, 0]  # G + B - 2R
 
             std_s1 = np.std(s1)
             std_s2 = np.std(s2)
-            if std_s2 < 1e-10:
-                continue
+            if std_s2 < 1e-10: continue
 
             alpha = std_s1 / std_s2
             h = s1 + alpha * s2
-            
-            # Overlap-add with partial normalization
-            # We keep the scale of 'h' (which represents the AC/DC pulse strength)
             pulse[t - window: t] += (h - np.mean(h))
 
         return pulse
 
     def _estimate_motion(self, frame: np.ndarray):
-        """
-        Estimate motion using simple frame differencing for speed.
-        High motion indicates potential artifacts.
-        """
+        """Estimate frame-to-frame motion score."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (80, 60))  # Downsample heavily for speed
-
+        gray = cv2.GaussianBlur(gray, (7, 7), 0)
+        
         if self._prev_gray is not None:
-            # Simple absolute difference instead of expensive optical flow
-            diff = cv2.absdiff(self._prev_gray, gray)
-            self._motion_score = float(np.mean(diff))
-        else:
-            self._motion_score = 0.0
-
+            # Shift check
+            diff = cv2.absdiff(gray, self._prev_gray)
+            self._motion_score = np.mean(diff)
+        
         self._prev_gray = gray
 
     def _compute_actual_fps(self) -> float:

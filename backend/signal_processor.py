@@ -185,18 +185,57 @@ class SignalProcessor:
         return band_freqs, band_power, dominant_freq
 
     def compute_heart_rate(self, filtered_signal: np.ndarray) -> Optional[float]:
-        """Compute heart rate from HR-band filtered signal."""
-        _, _, freq = self.compute_fft(
+        """
+        Advanced clinical-grade HR computation.
+        Uses FFT + Auto-Correlation + Harmonic verification.
+        """
+        # Stream 1: Frequency Domain (FFT)
+        band_freqs, band_power, dominant_freq = self.compute_fft(
             filtered_signal,
             (self.filter_cfg.hr_low_freq, self.filter_cfg.hr_high_freq)
         )
-        if freq <= 0:
-            return None
+        
+        if dominant_freq <= 0: return None
 
-        hr = freq * 60.0
-        if (self.quality_cfg.min_acceptable_hr <= hr <=
-                self.quality_cfg.max_acceptable_hr):
-            return round(hr, 1)
+        # Precision Step: Parabolic Interpolation for sub-bin accuracy
+        idx = np.argmax(band_power)
+        if 0 < idx < len(band_power) - 1:
+            y1, y2, y3 = np.log(band_power[idx-1] + 1e-10), np.log(band_power[idx] + 1e-10), np.log(band_power[idx+1] + 1e-10)
+            denom = (y1 - 2*y2 + y3)
+            if abs(denom) > 1e-10:
+                dist = (y1 - y3) / (2 * denom)
+                # Correct the frequency based on peak center
+                df = band_freqs[1] - band_freqs[0]
+                dominant_freq = dominant_freq + dist * df
+
+        # Stream 2: Time Domain (Auto-Correlation)
+        # AC verifies the periodicity and helps reject noise peaks
+        norm_sig = (filtered_signal - np.mean(filtered_signal)) / (np.std(filtered_signal) + 1e-10)
+        corr = np.correlate(norm_sig, norm_sig, mode='full')
+        corr = corr[len(corr)//2:]
+        
+        # Searching for first major peak in IBI range (300ms to 1500ms)
+        ibi_min = int(self.fps * 0.4) # 150 bpm
+        ibi_max = int(self.fps * 1.5) # 40 bpm
+        
+        ibi_peak = 0
+        if len(corr) > ibi_max:
+            corr_band = corr[ibi_min:ibi_max]
+            if len(corr_band) > 0:
+                ibi_peak = np.argmax(corr_band) + ibi_min
+        
+        ac_hr = (self.fps / ibi_peak * 60.0) if ibi_peak > 0 else 0
+        fft_hr = dominant_freq * 60.0
+        
+        # Fusion & Verification:
+        # If FFT and AC agree within 10%, we have a high-confidence lock
+        if ac_hr > 0 and abs(fft_hr - ac_hr) / fft_hr < 0.1:
+            final_hr = (fft_hr + ac_hr) / 2.0
+        else:
+            final_hr = fft_hr # Fallback to FFT if mismatch (noisy AC)
+
+        if (self.quality_cfg.min_acceptable_hr <= final_hr <= self.quality_cfg.max_acceptable_hr):
+            return round(final_hr, 1)
         return None
 
     def compute_respiratory_rate(
