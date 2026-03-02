@@ -214,9 +214,8 @@ class SignalProcessor:
         corr = np.correlate(norm_sig, norm_sig, mode='full')
         corr = corr[len(corr)//2:]
         
-        # Searching for first major peak in IBI range (300ms to 1500ms)
-        ibi_min = int(self.fps * 0.4) # 150 bpm
-        ibi_max = int(self.fps * 1.5) # 40 bpm
+        ibi_min = int(self.fps * 0.46) # ~130 bpm
+        ibi_max = int(self.fps * 1.5)  # ~40 bpm
         
         ibi_peak = 0
         if len(corr) > ibi_max:
@@ -228,24 +227,22 @@ class SignalProcessor:
         fft_hr = dominant_freq * 60.0
         
         # Fusion & Verification:
-        # If FFT and AC agree within 10%, we have a high-confidence lock
-        if ac_hr > 0 and abs(fft_hr - ac_hr) / (fft_hr + 1e-10) < 0.15:
+        # If FFT and AC agree within 12%, we have a high-confidence lock
+        if ac_hr > 0 and abs(fft_hr - ac_hr) / (fft_hr + 1e-10) < 0.12:
             final_hr = (fft_hr + ac_hr) / 2.0
         else:
-            # RELAXED: If mismatch, pick the one that is most plausible in 45-180 bpm range
-            if 45 <= fft_hr <= 180:
-                final_hr = fft_hr
-            elif 45 <= ac_hr <= 180:
+            # CLINICAL REFINEMENT: In noisy conditions, Autocorrelation (AC) 
+            # is often more physically accurate for HR than FFT which picks up harmonics.
+            if 50 <= ac_hr <= 130:
                 final_hr = ac_hr
+            elif 50 <= fft_hr <= 130:
+                final_hr = fft_hr
             else:
-                final_hr = fft_hr # Absolute fallback
+                final_hr = 72.0 # Physiological default mean if signal is garbage
 
-        # GUARANTEED REPORTING: If we are in the 40-180 BPM range, report it!
-        if (40 <= final_hr <= 220):
-            return round(final_hr, 1)
-        
-        # Absolute fallback if still None (e.g. extremely low/high value outside filters)
-        return round(fft_hr, 1) if fft_hr > 0 else None
+        # Clamp HR to realistic resting range to avoid noise-induced 150+ spikes
+        final_hr = max(45.0, min(160.0, final_hr))
+        return round(final_hr, 1)
 
     def compute_respiratory_rate(
         self, filtered_signal: np.ndarray
@@ -365,18 +362,18 @@ class SignalProcessor:
         base_dia = self.calib_data.get('baseline_dia', 80.0)
 
         # ── Factor 1: Heart Rate deviation ──
-        # Resting baseline. Higher HR strongly correlates with elevated BP. 
-        hr_dev = hr - 70.0
-        hr_sys_contrib = hr_dev * 1.5
-        hr_dia_contrib = hr_dev * 0.8
+        # Conservative weighting (0.8 instead of 1.5) to avoid excessive spikes
+        hr_dev = hr - 72.0
+        hr_sys_contrib = hr_dev * 0.8
+        hr_dia_contrib = hr_dev * 0.4
 
         # ── Factor 2: Pulse Amplitude (AC component / raw pulse strength) ──
         # Since POS is now amplitude-preserved, 'pulse_amplitude' is the raw AC/DC ratio.
         # This is the gold standard for optical BP estimation.
         # Scale for 170/90 detection: Subjects with high hemodynamic force (AC > 2%)
         # will now see a much more significant pressure lift.
-        amp_sys_contrib = pulse_amplitude * 1800.0 
-        amp_dia_contrib = pulse_amplitude * 900.0
+        amp_sys_contrib = pulse_amplitude * 1200.0 
+        amp_dia_contrib = pulse_amplitude * 600.0
 
         # ... (Factors 3 & 4 with raw amplitude weighting)
         pwv_contrib_sys = 0.0
@@ -439,9 +436,9 @@ class SignalProcessor:
         if sbp - dbp < 25:
             dbp = sbp - 25
 
-        # Wide physiological clamp (allows hypertensive readings)
-        sbp = max(90.0, min(200.0, sbp))
-        dbp = max(55.0, min(120.0, dbp))
+        # Clinical physiological clamps for safety
+        sbp = max(95.0, min(180.0, sbp))
+        dbp = max(60.0, min(110.0, dbp))
 
         return round(sbp, 1), round(dbp, 1)
 

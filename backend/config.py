@@ -61,18 +61,22 @@ class FilterConfig:
 class FFTConfig:
     """FFT and peak detection settings."""
     zero_pad_factor: int = 4     # Zero-padding multiplier for FFT
-    peak_prominence: float = 0.01  # Ultra-sensitive for weak/distal signals
+    peak_prominence: float = 0.03  # Increased for better signal/noise separation
     peak_distance_hz: float = 0.3  # Minimum distance between peaks in Hz
 
 
 @dataclass
 class QualityConfig:
     """Signal Quality Index thresholds."""
-    sqi_snr_threshold: float = -10.0       # Extremely relaxed for guaranteed capture
-    sqi_spectral_purity: float = 0.05     # Extremely relaxed
+    sqi_snr_threshold: float = -2.0       # Balanced for accuracy vs speed
+    sqi_spectral_purity: float = 0.1     # Filter out total noise harmonics
     sqi_motion_threshold: float = 20.0   # Slightly more tolerant to minor movement
     sqi_face_confidence: float = 0.5     # Min face detection confidence
-    rejection_window: int = 5            # Faster recovery (5s) before rejection logic kicks in
+    rejection_window: int = 10            # Increased to 10s for better baseline stability
+    # IBI (Inter-Beat Interval) range for peak detection (in frames)
+    # Cap at ~130 BPM (0.46s) for better noise rejection in resting users
+    ibi_min_s: float = 0.46 # Minimum IBI in seconds (~130 BPM)
+    ibi_max_s: float = 1.5  # Maximum IBI in seconds (~40 BPM)
     min_acceptable_hr: float = 40.0      # Minimum plausible HR
     max_acceptable_hr: float = 200.0     # Maximum plausible HR
     min_acceptable_rr: float = 6.0       # Minimum plausible RR

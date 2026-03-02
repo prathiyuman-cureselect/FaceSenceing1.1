@@ -204,7 +204,7 @@ class RPPGEngine:
         result.buffer_fill = buffer_len / self.config.buffer_size * 100
 
         # Step 4: Intelligent Patch Fusion (Spatial-Temporal filtering)
-        if buffer_len < 10: # Ultra-fast (under 1s)
+        if buffer_len < 30: # Minimum 3.0s for accurate HR sensing
             result.message = f"Locking Pulse... {result.buffer_fill:.0f}%"
             return result
             
@@ -354,9 +354,10 @@ class RPPGEngine:
             if pulse is not None:
                 # Calculate SNR for this patch
                 snr = self._calculate_signal_snr(pulse)
-                # RELAXED: Accept all pulses to ensure we have data, even if noisy
-                all_pulses.append(pulse)
-                all_snrs.append(max(0.1, snr))
+                # MODERATE: Only accept pulses that have a recognizable periodic component (SNR > 0.2)
+                if snr > 0.2:
+                    all_pulses.append(pulse)
+                    all_snrs.append(snr)
         
         if not all_pulses:
             return None

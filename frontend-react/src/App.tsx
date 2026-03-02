@@ -311,7 +311,7 @@ const App: React.FC = () => {
         autoCompleteSession();
       } else {
         // Failsafe: if we've been scanning for >8s and still in 'face' phase, force 'vitals'
-        if (scanStateRef.current.scanPhase === 'face' && elapsed > 6) {
+        if (scanStateRef.current.scanPhase === 'face' && elapsed > 8) {
           setScanState(prev => ({ ...prev, scanPhase: 'vitals' }));
         }
 

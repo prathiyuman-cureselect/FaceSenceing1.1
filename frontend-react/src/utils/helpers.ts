@@ -35,8 +35,18 @@ export function isDataAccurate(
         'allHR' | 'goodMeasurements' | 'totalMeasurements'
     >
 ): boolean {
-    // RELAXED: If we have at least 40 samples (~4 seconds of data), allow completion
-    return state.allHR.length >= 40;
+    // CLINICAL REFINEMENT: Require at least 60 samples (~6s) AND stable signal (low variance)
+    if (state.allHR.length < 60) return false;
+
+    const lastSamples = state.allHR.slice(-8);
+    if (lastSamples.length < 8) return false;
+
+    const mean = lastSamples.reduce((a, b) => a + b, 0) / lastSamples.length;
+    const variance = lastSamples.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / lastSamples.length;
+    const stdDev = Math.sqrt(variance);
+
+    // HR should be stable within a 2.0 BPM deviation to be considered clinical-grade
+    return stdDev < 2.0;
 }
 
 export function getModeString(arr: string[]): string {
