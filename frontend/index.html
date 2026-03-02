@@ -37,10 +37,10 @@
             </div>
 
             <button class="btn btn-primary btn-start-custom" id="btnStart">
-                🔬 Start Scan (35 seconds)
+                Start Scan (35 seconds)
             </button>
             <p class="startup-disclaimer">
-                🔒 Camera only · Video never leaves your device · Not for clinical diagnosis
+                Camera only · Video never leaves your device · Not for clinical diagnosis
             </p>
         </div>
     </div>
@@ -61,10 +61,10 @@
                 </p>
                 <div class="results-actions">
                     <button class="btn btn-secondary" id="btnPrintReport">
-                        📄 Download/Print Report
+                        Download/Print Report
                     </button>
                     <button class="btn btn-primary btn-start-custom" id="btnScanAgain">
-                        🔬 New Analysis
+                         New Analysis
                     </button>
                 </div>
             </div>
@@ -93,7 +93,7 @@
 
         <!-- Message Bar -->
         <div class="message-bar" id="messageBar">
-            <span class="icon">ℹ️</span>
+            <!-- <span class="icon">ℹ️</span> -->
             <span id="messageText">Click "Start Scan" to begin vital sign analysis.</span>
         </div>
 
@@ -116,7 +116,7 @@
                     </div>
                     <div class="status-chip timer" id="timerChip"
                         style="display:none; background: #0f172a; color: white;">
-                        <span id="timerText">⏱️ 30s</span>
+                        <span id="timerText">⏱30s</span>
                     </div>
                     <div class="status-chip quality" id="qualityChip">
                         <span id="qualityChipText">—</span>
@@ -132,19 +132,19 @@
         <!-- ─── Vital Signs Grid ─── -->
         <section class="vitals-grid" id="vitalsGrid">
             <div class="vital-card hr" id="cardHR">
-                <span class="vital-label"><span class="icon">❤️</span> Heart Rate</span>
+                <!-- <span class="vital-label"><span class="icon">❤️</span> Heart Rate</span> -->
                 <div class="vital-value inactive" id="hrValue">--</div>
                 <span class="vital-unit">BPM</span>
                 <div class="vital-sparkline"><canvas id="sparklineHR" width="200" height="36"></canvas></div>
             </div>
             <div class="vital-card rr" id="cardRR">
-                <span class="vital-label"><span class="icon">🌬️</span> Breathing Rate</span>
+                <!-- <span class="vital-label"><span class="icon">🌬️</span> Breathing Rate</span> -->
                 <div class="vital-value inactive" id="rrValue">--</div>
                 <span class="vital-unit">br/min</span>
                 <div class="vital-sparkline"><canvas id="sparklineRR" width="200" height="36"></canvas></div>
             </div>
             <div class="vital-card bp" id="cardBP">
-                <span class="vital-label"><span class="icon">🩺</span> Blood Pressure</span>
+                <!-- <span class="vital-label"><span class="icon">🩺</span> Blood Pressure</span> -->
                 <div class="vital-value inactive" id="bpValue">--</div>
                 <span class="vital-unit">mmHg</span>
                 <div class="hrv-detail-row">
@@ -159,12 +159,12 @@
                 </div>
             </div>
             <div class="vital-card spo2" id="cardSpO2">
-                <span class="vital-label"><span class="icon">🩸</span> SpO2</span>
+                <!-- <span class="vital-label"><span class="icon">🩸</span> SpO2</span> -->
                 <div class="vital-value inactive" id="spo2Value">--</div>
                 <span class="vital-unit">%</span>
             </div>
             <div class="vital-card hrv" id="cardHRV">
-                <span class="vital-label"><span class="icon">📊</span> HRV (RMSSD)</span>
+                <!-- <span class="vital-label"><span class="icon">📊</span> HRV (RMSSD)</span> -->
                 <div class="vital-value inactive" id="hrvValue">--</div>
                 <span class="vital-unit">ms</span>
                 <div class="hrv-detail-row">
@@ -179,7 +179,7 @@
                 </div>
             </div>
             <div class="vital-card temp" id="cardTemp">
-                <span class="vital-label"><span class="icon">🌡️</span> Body Temperature</span>
+                <!-- <span class="vital-label"><span class="icon">🌡️</span> Body Temperature</span> -->
                 <div class="vital-value inactive" id="tempValue">--</div>
                 <span class="vital-unit">°F</span>
                 <div class="hrv-detail-row">
@@ -190,7 +190,7 @@
                 </div>
             </div>
             <div class="vital-card stress" id="cardStress">
-                <span class="vital-label"><span class="icon">🧠</span> Stress & ANS</span>
+                <!-- <span class="vital-label"><span class="icon">🧠</span> Stress & ANS</span> -->
                 <div class="vital-value inactive" id="stressValue">--</div>
                 <span class="vital-unit">Stress Index</span>
                 <div class="hrv-detail-row">
@@ -210,17 +210,17 @@
                 <span class="vital-unit">% Activity</span>
             </div>
             <div class="vital-card parasympathetic" id="cardParasympathetic">
-                <span class="vital-label"><span class="icon">🧘</span> Parasympathetic</span>
+                <!-- <span class="vital-label"><span class="icon">🧘</span> Parasympathetic</span> -->
                 <div class="vital-value inactive" id="parasympatheticValue">--</div>
                 <span class="vital-unit">% Activity</span>
             </div>
             <div class="vital-card prq" id="cardPRQ">
-                <span class="vital-label"><span class="icon">🔄</span> PRQ</span>
+                <!-- <span class="vital-label"><span class="icon">🔄</span> PRQ</span> -->
                 <div class="vital-value inactive" id="prqValue">--</div>
                 <span class="vital-unit">Recovery Quotient</span>
             </div>
             <div class="vital-card wellness" id="cardWellness">
-                <span class="vital-label"><span class="icon">💚</span> Wellness Score</span>
+                <!-- <span class="vital-label"><span class="icon">💚</span> Wellness Score</span> -->
                 <div class="vital-value inactive" id="wellnessValue">--</div>
                 <span class="vital-unit">/ 10</span>
             </div>
@@ -229,7 +229,7 @@
         <!-- ─── Signal Quality ─── -->
         <section class="card quality-section" id="qualitySection">
             <div class="card-header">
-                <span class="card-title"><span class="icon">🛡️</span> Signal Quality Index</span>
+                <!-- <span class="card-title"><span class="icon">🛡️</span> Signal Quality Index</span> -->
                 <span class="quality-level-badge rejected" id="sqiLevelBadge">
                     <span id="sqiLevelText">WAITING</span>
                 </span>
@@ -305,7 +305,7 @@
     <!-- ═══ Session Summary Modal (legacy) ═══ -->
     <div class="modal-backdrop" id="summaryModal">
         <div class="modal">
-            <h3>📋 Session Summary</h3>
+            <h3>Session Summary</h3>
             <div class="summary-grid" id="summaryGrid"></div>
             <button class="btn btn-primary" id="btnCloseSummary" style="width:100%;">Close</button>
         </div>

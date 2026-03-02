@@ -6,7 +6,7 @@ with ROI extraction for forehead and cheek regions.
 """
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np

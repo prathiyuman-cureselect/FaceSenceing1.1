@@ -440,14 +440,14 @@ function startFrameCapture() {
 
         // Professional clinical labels to show complexity (Binah style)
         const clinicalSteps = [
-            "💓 Locking Arterial Pulse...",
-            "🧬 Analyzing Hemodynamics...",
-            "🔬 SpO2 Oxygenation Scan...",
-            "📊 Computing HRV Metrics...",
-            "🧠 Assessing Stress Index...",
-            "💉 Estimating Blood Markers...",
-            "🌡️ Skin Thermal Analysis...",
-            "🛡️ Finalizing Health Report..."
+            "Locking Arterial Pulse...",
+            "Analyzing Hemodynamics...",
+            "SpO2 Oxygenation Scan...",
+            "Computing HRV Metrics...",
+            "Assessing Stress Index...",
+            "Estimating Blood Markers...",
+            "Skin Thermal Analysis...",
+            "Finalizing Health Report..."
         ];
         const stepIdx = Math.floor((elapsed / totalDuration) * clinicalSteps.length);
         const currentStep = clinicalSteps[Math.min(stepIdx, clinicalSteps.length - 1)];
